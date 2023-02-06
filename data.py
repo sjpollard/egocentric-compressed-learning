@@ -25,7 +25,7 @@ class Loader:
         start_frame = annotation[2]
         stop_frame = annotation[3]
         zero = '0'
-        transform = transforms.Compose([transforms.PILToTensor()])
+        transform = transforms.Compose([transforms.PILToTensor(), transforms.Resize((224,224))])
         segments = np.array_split(
             np.arange(start_frame, stop_frame + 1), num_segments)
         snippets = list(

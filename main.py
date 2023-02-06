@@ -1,9 +1,9 @@
 import numpy as np
 import pandas as pd
 import tensorly as tl
-
+import torchvision
 import compress
-import loader
+import data
 
 tl.set_backend('pytorch')
 
@@ -15,13 +15,21 @@ def preprocess_epic(loader):
 
 
 def main():
-    windows_load = loader.Loader('C:/Users/SAM/EPIC-KITCHENS',
+    windows_loader = data.Loader('C:/Users/SAM/EPIC-KITCHENS',
                                  'C:/Users/SAM/Documents/GitHub/epic-kitchens-100-annotations',
                                  'C:/Users/SAM/Documents/GitHub/egocentric-compressed-learning/data')
-    """ linux_load = loader.Loader('/home/hiraeth/EPIC-KITCHENS',
+    """ linux_loader = data.Loader('/home/hiraeth/EPIC-KITCHENS',
                                '/home/hiraeth/Github/epic-kitchens-100-annotations',
                                '/home/hiraeth/Github/egocentric-compressed-learning') """
-    print(windows_load.load_from_pt('train_Y.pt').size())
+    #preprocess_epic(windows_loader)
+    train_X, train_Y = windows_loader.load_from_pt('train_X.pt'), windows_loader.load_from_pt('train_Y.pt')
+    clip = train_X[0]
+    torchvision.transforms.functional.to_pil_image(clip[3]).show()
+    W1 = compress.random_gaussian_matrix((100, 224))
+    W2 = compress.random_gaussian_matrix((100, 224))
+    compressed_clip = compress.compress_tensor(tl.tensor(clip), [W1, W2], [3, 2])
+    torchvision.transforms.functional.to_pil_image(compressed_clip[3]).save('image.png')
+
 
 
 if __name__ == '__main__':
