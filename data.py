@@ -25,7 +25,8 @@ class Loader:
         start_frame = annotation[2]
         stop_frame = annotation[3]
         zero = '0'
-        transform = transforms.Compose([transforms.PILToTensor(), transforms.Resize((224,224))])
+        transform = transforms.Compose(
+            [transforms.PILToTensor(), transforms.Resize((224, 224))])
         segments = np.array_split(
             np.arange(start_frame, stop_frame + 1), num_segments)
         snippets = list(
@@ -36,23 +37,8 @@ class Loader:
             f'{self.dataset_path}/{participant_id}/rgb_frames/{video_id}/frame_{x}.jpg')), file_names)))
         return frames
 
-    def get_annotation_snippets2(self, annotation, num_segments):
-        participant_id = annotation[0]
-        video_id = annotation[1]
-        start_frame = annotation[2]
-        stop_frame = annotation[3]
-        zero = '0'
-        segments = np.array_split(
-            np.arange(start_frame, stop_frame + 1), num_segments)
-        snippets = list(
-            map(lambda x: str(np.random.default_rng().choice(x)), segments))
-        file_names = list(
-            map(lambda x: f'{(10 - len(x)) * zero}{x}', snippets))
-        frames = list(map(lambda x: np.asarray(Image.open(
-            f'{self.dataset_path}/{participant_id}/rgb_frames/{video_id}/frame_{x}.jpg')), file_names))
-        return frames
-
     # TODO Change this to read in entire training set when I have it on hand.
+
     def get_train(self, num_segments):
         annotations = self.train_annotations.loc[0:328, ['participant_id',
                                                          'video_id', 'start_frame', 'stop_frame']].values

@@ -2,6 +2,8 @@ import numpy as np
 import tensorly as tl
 import torch
 
+tl.set_backend('pytorch')
+
 
 def random_gaussian_matrix(shape):
 
@@ -10,6 +12,7 @@ def random_gaussian_matrix(shape):
     M = torch.normal(mu, sigma, size=shape)
 
     return M
+
 
 def compress_tensor(X, phi_matrices, modes):
     return tl.tenalg.multi_mode_dot(X, phi_matrices, modes)
