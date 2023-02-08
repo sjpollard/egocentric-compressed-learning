@@ -12,11 +12,7 @@ class Loader:
     def __init__(self, dataset_path, annotations_path, data_path):
         self.dataset_path = dataset_path
         self.train_annotations = pd.read_csv(
-            f'{annotations_path}/EPIC_100_train.csv')
-        self.val_annotations = pd.read_csv(
-            f'{annotations_path}/EPIC_100_validation.csv')
-        self.test_annotations = pd.read_csv(
-            f'{annotations_path}/EPIC_100_test_timestamps.csv')
+            f'{annotations_path}/EPIC_train_action_labels.csv')
         self.data_path = data_path
 
     def get_annotation_snippets(self, annotation, num_segments):

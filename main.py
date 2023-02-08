@@ -16,10 +16,10 @@ def preprocess_epic(loader):
 
 def main():
     windows_loader = data.Loader('C:/Users/SAM/EPIC-KITCHENS',
-                                 'C:/Users/SAM/Documents/GitHub/epic-kitchens-100-annotations',
+                                 'C:/Users/SAM/Documents/GitHub/epic-kitchens-55-annotations',
                                  'C:/Users/SAM/Documents/GitHub/egocentric-compressed-learning/data')
     """ linux_loader = data.Loader('/home/hiraeth/EPIC-KITCHENS',
-                               '/home/hiraeth/Github/epic-kitchens-100-annotations',
+                               '/home/hiraeth/Github/epic-kitchens-55-annotations',
                                '/home/hiraeth/Github/egocentric-compressed-learning') """
     # preprocess_epic(windows_loader)
     train_X, train_Y = windows_loader.load_from_pt('train_X.pt'), windows_loader.load_from_pt('train_Y.pt')
