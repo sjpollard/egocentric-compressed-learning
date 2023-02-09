@@ -16,7 +16,7 @@ def random_gaussian_matrix(shape):
 
 def random_bernoulli_matrix(shape):
     root_m = math.sqrt(shape[0])
-    M = np.random.default_rng().choice([-1.0 / root_m, 1.0/root_m], shape, p=[0.5, 0.5])
+    M = np.random.default_rng().choice([-1.0 / root_m, 1.0 / root_m], shape, p=[0.5, 0.5])
     return torch.from_numpy(M).float()
 
 
