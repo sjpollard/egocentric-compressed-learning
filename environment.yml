@@ -1,0 +1,21 @@
+name: epic-models
+channels:
+  - conda-forge
+  - pytorch
+  - defaults
+dependencies:
+  - pip
+  - numpy
+  - pillow
+  - pandas
+  - tensorly
+  - pytorch
+  - torchvision
+  - pip:
+    # The released version of pretrainedmodels has a bug around DataParallel and
+    # pytorch 1.0, see the following links for details:
+    # - https://github.com/Cadene/pretrained-models.pytorch/pull/145
+    # - https://github.com/Cadene/pretrained-models.pytorch/issues/112
+    # - https://github.com/Cadene/pretrained-models.pytorch/issues/120
+    # - https://github.com/pytorch/pytorch/issues/8637
+    - "git+https://github.com/wpwei/pretrained-models.pytorch.git@vision_bug_fix#egg=pretrainedmodels"

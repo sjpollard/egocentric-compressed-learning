@@ -15,21 +15,21 @@ def preprocess_epic(loader):
 
 
 def main():
-    windows_loader = data.Loader('C:/Users/SAM/EPIC-KITCHENS',
+    """ windows_loader = data.Loader('C:/Users/SAM/EPIC-KITCHENS',
                                  'C:/Users/SAM/Documents/GitHub/epic-kitchens-100-annotations',
-                                 'C:/Users/SAM/Documents/GitHub/egocentric-compressed-learning/data')
-    """ linux_loader = data.Loader('/home/hiraeth/EPIC-KITCHENS',
+                                 'C:/Users/SAM/Documents/GitHub/egocentric-compressed-learning/data') """
+    linux_loader = data.Loader('/home/hiraeth/EPIC-KITCHENS',
                                '/home/hiraeth/Github/epic-kitchens-100-annotations',
-                               '/home/hiraeth/Github/egocentric-compressed-learning') """
-    # preprocess_epic(windows_loader)
-    train_X, train_Y = windows_loader.load_from_pt('train_X.pt'), windows_loader.load_from_pt('train_Y.pt')
+                               '/home/hiraeth/Github/egocentric-compressed-learning/data')
+    #preprocess_epic(linux_loader)
+    train_X, train_Y =linux_loader.load_from_pt('train_X.pt'), linux_loader.load_from_pt('train_Y.pt')
     clip = train_X[0]
     torchvision.transforms.functional.to_pil_image(clip[3]).show()
     M1 = compress.random_bernoulli_matrix((100, 224))
     M2 = compress.random_bernoulli_matrix((100, 224))
-    compressed_clip = compress.compress_tensor(clip.float(), [M2], [2])
+    compressed_clip = compress.compress_tensor(clip.float(), [M1, M2], [3, 2])
     torchvision.transforms.functional.to_pil_image(compressed_clip[3]).show()
-    expanded_clip = compress.expand_tensor(compressed_clip, [M2.T], [2])
+    expanded_clip = compress.expand_tensor(compressed_clip, [M1.T, M2.T], [3, 2])
     torchvision.transforms.functional.to_pil_image(expanded_clip[3]).show()
 
 

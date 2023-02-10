@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import tensorly as tl
 import torch
+import os
 from torchvision import transforms
 from PIL import Image
 
@@ -17,6 +18,7 @@ class Loader:
             f'{annotations_path}/EPIC_100_validation.csv')
         self.test_annotations = pd.read_csv(
             f'{annotations_path}/EPIC_100_test_timestamps.csv')
+        self.data_path = data_path
         
     def get_annotation_snippets(self, annotation, num_segments):
         participant_id = annotation[0]
@@ -48,6 +50,8 @@ class Loader:
         return train_X, train_Y
 
     def save_to_pt(self, filename, tensor):
+        if not os.path.exists(self.data_path):
+            os.makedirs(self.data_path)
         torch.save(tensor, f'{self.data_path}/{filename}')
 
     def load_from_pt(self, filename):
