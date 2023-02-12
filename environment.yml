@@ -2,6 +2,7 @@ name: epic-models
 channels:
   - conda-forge
   - pytorch
+  - nvidia
   - defaults
 dependencies:
   - pip
@@ -11,6 +12,7 @@ dependencies:
   - tensorly
   - pytorch
   - torchvision
+  - pytorch-cuda=11.6
   - pip:
     # The released version of pretrainedmodels has a bug around DataParallel and
     # pytorch 1.0, see the following links for details:

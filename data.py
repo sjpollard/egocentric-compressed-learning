@@ -5,11 +5,23 @@ import torch
 import os
 from torchvision import transforms
 from PIL import Image
+from torch.utils.data import Dataset
 
 tl.set_backend('pytorch')
 
+class CustomClipDataset(Dataset):
+  def __init__(self, dataset):
+    assert dataset[0].size(0) == dataset[1].size(0)
+    self.x = dataset[0]
+    self.y = dataset[1]
 
-class Loader:
+  def __getitem__(self, index):
+    return self.x[index], self.y[index]
+
+  def __len__(self):
+    return self.x.size(0)
+
+class Preprocessor:
     def __init__(self, dataset_path, annotations_path, data_path):
         self.dataset_path = dataset_path
         self.train_annotations = pd.read_csv(

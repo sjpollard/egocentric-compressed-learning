@@ -1,37 +1,191 @@
-import numpy as np
-import pandas as pd
+#!/usr/bin/env python3
+import argparse
+import logging
+import sys
+
+from pathlib import Path
+from typing import Any, Dict
+
+import torch
 import tensorly as tl
 import torchvision
 import compress
 import data
 
+from model_loader import load_checkpoint, make_model
+from data import CustomClipDataset
+from torch.utils.data import DataLoader
+from torch import nn
+
 tl.set_backend('pytorch')
 
+torch.backends.cudnn.benchmark = True
 
-def preprocess_epic(loader):
-    train_X, train_Y = loader.get_train(8)
-    loader.save_to_pt('train_X.pt', train_X)
-    loader.save_to_pt('train_Y.pt', train_Y)
+if torch.cuda.is_available():
+    DEVICE = torch.device("cuda")
+else:
+    DEVICE = torch.device("cpu")
+
+parser = argparse.ArgumentParser(
+    description="Test the instantiation and forward pass of models",
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+)
+parser.add_argument(
+    "model_type",
+    nargs="?",
+    choices=["tsn", "tsm", "tsm-nl", "trn", "mtrn"],
+    default=None,
+)
+parser.add_argument(
+    "--checkpoint",
+    type=Path,
+    help="Path to checkpointed model. Should be a dictionary containing the keys:"
+    " 'model_type', 'segment_count', 'modality', 'state_dict', and 'arch'.",
+)
+parser.add_argument(
+    "--arch",
+    default="resnet50",
+    choices=["BNInception", "resnet50"],
+    help="Backbone architecture",
+)
+parser.add_argument(
+    "--modality", default="RGB", choices=["RGB", "Flow"], help="Input modality"
+)
+parser.add_argument(
+    "--flow-length", default=5, type=int, help="Number of (u, v) pairs in flow stack"
+)
+parser.add_argument(
+    "--dropout",
+    default=0.7,
+    type=float,
+    help="Dropout probability. The dropout layer replaces the "
+    "backbone's classification layer.",
+)
+parser.add_argument(
+    "--trn-img-feature-dim",
+    default=256,
+    type=int,
+    help="Number of dimensions for the output of backbone network. "
+    "This is effectively the image feature dimensionality.",
+)
+parser.add_argument(
+    "--segment-count",
+    default=8,
+    type=int,
+    help="Number of segments. For RGB this corresponds to number of "
+    "frames, whereas for Flow, it is the number of points from "
+    "which a stack of (u, v) frames are sampled.",
+)
+parser.add_argument(
+    "--tsn-consensus-type",
+    choices=["avg", "max"],
+    default="avg",
+    help="Consensus function for TSN used to fuse class scores from "
+    "each segment's predictoin.",
+)
+parser.add_argument(
+    "--tsm-shift-div",
+    default=8,
+    type=int,
+    help="Reciprocal proportion of features temporally-shifted.",
+)
+parser.add_argument(
+    "--tsm-shift-place",
+    default="blockres",
+    choices=["block", "blockres"],
+    help="Location for the temporal shift to take place. Either 'block' for the shift "
+    "to happen in the non-residual part of a block, or 'blockres' if the shift happens "
+    "in the residual path.",
+)
+parser.add_argument(
+    "--tsm-temporal-pool",
+    action="store_true",
+    help="Gradually temporally pool throughout the network",
+)
+parser.add_argument("--batch-size", default=10, type=int, help="Batch size")
+parser.add_argument("--epochs", default=10, type=int, help="Number of epochs to train")
+parser.add_argument("--lr", default=1e-1, type=float, help="Learning rate")
+parser.add_argument("--print-model", action="store_true", help="Print model definition")
 
 
-def main():
-    """ windows_loader = data.Loader('C:/Users/SAM/EPIC-KITCHENS',
+def extract_settings_from_args(args: argparse.Namespace) -> Dict[str, Any]:
+    settings = vars(args)
+    for variant in ["trn", "tsm", "tsn"]:
+        variant_key_prefix = f"{variant}_"
+        variant_keys = {
+            key for key in settings.keys() if key.startswith(variant_key_prefix)
+        }
+        for key in variant_keys:
+            stripped_key = key[len(variant_key_prefix) :]
+            settings[stripped_key] = settings[key]
+            del settings[key]
+    return settings
+
+
+def preprocess_epic(preprocessor, segment_count):
+    train_X, train_Y = preprocessor.get_train(segment_count)
+    preprocessor.save_to_pt('train_X.pt', train_X)
+    preprocessor.save_to_pt('train_Y.pt', train_Y)
+
+
+def main(args):
+    logging.basicConfig(level=logging.INFO)
+    if args.checkpoint is None:
+        if args.model_type is None:
+            print("If not providing a checkpoint, you must specify model_type")
+            sys.exit(1)
+        settings = extract_settings_from_args(args)
+        model = make_model(settings)
+    elif args.checkpoint is not None and args.checkpoint.exists():
+        model = load_checkpoint(args.checkpoint)
+    else:
+        print(f"{args.checkpoint} doesn't exist")
+        sys.exit(1)
+
+    if args.print_model:
+        print(model)
+    height, width = model.input_size, model.input_size
+    if model.modality == "RGB":
+        channel_dim = 3
+    elif model.modality == "Flow":
+        channel_dim = args.flow_length * 2
+    else:
+        raise ValueError(f"Unknown modality {args.modality}")
+    
+    preprocessor = data.Preprocessor('C:/Users/SAM/EPIC-KITCHENS',
                                  'C:/Users/SAM/Documents/GitHub/epic-kitchens-100-annotations',
-                                 'C:/Users/SAM/Documents/GitHub/egocentric-compressed-learning/data') """
-    linux_loader = data.Loader('/home/hiraeth/EPIC-KITCHENS',
+                                 'C:/Users/SAM/Documents/GitHub/egocentric-compressed-learning/data')
+    """ preprocessor = data.Preprocessor('/home/hiraeth/EPIC-KITCHENS',
                                '/home/hiraeth/Github/epic-kitchens-100-annotations',
-                               '/home/hiraeth/Github/egocentric-compressed-learning/data')
-    #preprocess_epic(linux_loader)
-    train_X, train_Y =linux_loader.load_from_pt('train_X.pt'), linux_loader.load_from_pt('train_Y.pt')
-    clip = train_X[0]
-    torchvision.transforms.functional.to_pil_image(clip[3]).show()
-    M1 = compress.random_bernoulli_matrix((100, 224))
-    M2 = compress.random_bernoulli_matrix((100, 224))
-    compressed_clip = compress.compress_tensor(clip.float(), [M1, M2], [3, 2])
-    torchvision.transforms.functional.to_pil_image(compressed_clip[3]).show()
-    expanded_clip = compress.expand_tensor(compressed_clip, [M1.T, M2.T], [3, 2])
-    torchvision.transforms.functional.to_pil_image(expanded_clip[3]).show()
+                               '/home/hiraeth/Github/egocentric-compressed-learning/data') """
+    #preprocess_epic(data_loader)
+    train_X, train_Y = preprocessor.load_from_pt('train_X.pt').float(), preprocessor.load_from_pt('train_Y.pt')
+    train_dataset = CustomClipDataset(dataset=(train_X, train_Y))
+    train_dataloader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    print(torch.cuda.is_available())
+    for epoch in range(args.epochs):
+        print("Epoch: ", epoch)
+        model.train()
+        for x, y in train_dataloader:
+            x = x.to(DEVICE)
+            y = y.to(DEVICE)
+            verb_output,_ = model(x)
+            verb_loss = criterion(verb_output, y[:, 0])
+            optimizer.zero_grad()
+            verb_loss.backward()
+            optimizer.step()
 
+    print(torch.argmax(model(train_X[100].float())))
 
-if __name__ == '__main__':
-    main()
+    #torchvision.transforms.functional.to_pil_image(input[0][3]).show()
+    #M1 = compress.random_bernoulli_matrix((100, 224))
+    #M2 = compress.random_bernoulli_matrix((100, 224))
+    #compressed_clip = compress.compress_tensor(input[0], [M1, M2], [3, 2])
+    #torchvision.transforms.functional.to_pil_image(compressed_clip[3]).show()
+    #input[0] = compress.expand_tensor(compressed_clip, [M1.T, M2.T], [3, 2])
+    #torchvision.transforms.functional.to_pil_image(clips[0][3]).show()
+
+if __name__ == "__main__":
+    main(parser.parse_args())
