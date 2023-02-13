@@ -151,7 +151,7 @@ def main(args):
         channel_dim = args.flow_length * 2
     else:
         raise ValueError(f"Unknown modality {args.modality}")
-    
+    model.to(DEVICE)
     preprocessor = data.Preprocessor('C:/Users/SAM/EPIC-KITCHENS',
                                  'C:/Users/SAM/Documents/GitHub/epic-kitchens-100-annotations',
                                  'C:/Users/SAM/Documents/GitHub/egocentric-compressed-learning/data')
@@ -164,7 +164,6 @@ def main(args):
     train_dataloader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    print(torch.cuda.is_available())
     for epoch in range(args.epochs):
         print("Epoch: ", epoch)
         model.train()
@@ -177,7 +176,7 @@ def main(args):
             verb_loss.backward()
             optimizer.step()
 
-    print(torch.argmax(model(train_X[100].float())))
+    print(torch.argmax(model(train_X[100].float().to(DEVICE))[0]), torch.argmax(model(train_X[100].float().to(DEVICE))[1]))
 
     #torchvision.transforms.functional.to_pil_image(input[0][3]).show()
     #M1 = compress.random_bernoulli_matrix((100, 224))
