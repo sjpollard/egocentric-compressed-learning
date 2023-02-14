@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import logging
+from pyexpat import model
 import sys
 
 from pathlib import Path
@@ -19,12 +20,12 @@ from torch import nn
 
 tl.set_backend('pytorch')
 
-torch.backends.cudnn.benchmark = True
+#torch.backends.cudnn.benchmark = True
 
 if torch.cuda.is_available():
-    DEVICE = torch.device("cuda")
+    DEVICE = torch.device('cuda')
 else:
-    DEVICE = torch.device("cpu")
+    DEVICE = torch.device('cuda')
 
 parser = argparse.ArgumentParser(
     description="Test the instantiation and forward pass of models",
@@ -104,7 +105,7 @@ parser.add_argument(
 )
 parser.add_argument("--batch-size", default=10, type=int, help="Batch size")
 parser.add_argument("--epochs", default=10, type=int, help="Number of epochs to train")
-parser.add_argument("--lr", default=1e-1, type=float, help="Learning rate")
+parser.add_argument("--lr", default=1e-2, type=float, help="Learning rate")
 parser.add_argument("--print-model", action="store_true", help="Print model definition")
 
 
@@ -126,6 +127,10 @@ def preprocess_epic(preprocessor, segment_count):
     train_X, train_Y = preprocessor.get_train(segment_count)
     preprocessor.save_to_pt('train_X.pt', train_X)
     preprocessor.save_to_pt('train_Y.pt', train_Y)
+
+def compute_accuracy(y, y_hat):
+    assert len(y) == len(y_hat)
+    return float((y == y_hat).sum()) / len(y)
 
 
 def main(args):
@@ -151,7 +156,6 @@ def main(args):
         channel_dim = args.flow_length * 2
     else:
         raise ValueError(f"Unknown modality {args.modality}")
-    model.to(DEVICE)
     preprocessor = data.Preprocessor('C:/Users/SAM/EPIC-KITCHENS',
                                  'C:/Users/SAM/Documents/GitHub/epic-kitchens-100-annotations',
                                  'C:/Users/SAM/Documents/GitHub/egocentric-compressed-learning/data')
@@ -163,20 +167,28 @@ def main(args):
     train_dataset = CustomClipDataset(dataset=(train_X, train_Y))
     train_dataloader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True)
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
+
+    model.to(DEVICE)
+    model.train()
     for epoch in range(args.epochs):
         print("Epoch: ", epoch)
         model.train()
+        i = 0
         for x, y in train_dataloader:
+            if i % 10 == 0 : print("Batch: ", i)
             x = x.to(DEVICE)
             y = y.to(DEVICE)
             verb_output,_ = model(x)
             verb_loss = criterion(verb_output, y[:, 0])
-            optimizer.zero_grad()
             verb_loss.backward()
             optimizer.step()
+            optimizer.zero_grad()
+            i += 1
+            with torch.no_grad():
+                print("Batch accuracy: ", compute_accuracy(y[:, 0], torch.argmax(verb_output, dim=-1)))
 
-    print(torch.argmax(model(train_X[100].float().to(DEVICE))[0]), torch.argmax(model(train_X[100].float().to(DEVICE))[1]))
+    print("Total accuracy: ", compute_accuracy(train_Y[:10, 0].to(DEVICE), torch.argmax(model(train_X[:10].to(DEVICE))[0], dim=-1)))
 
     #torchvision.transforms.functional.to_pil_image(input[0][3]).show()
     #M1 = compress.random_bernoulli_matrix((100, 224))
