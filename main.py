@@ -12,11 +12,14 @@ import tensorly as tl
 import torchvision
 import compress
 import data
+import pandas as pd
 
 from model_loader import load_checkpoint, make_model
-from data import CustomClipDataset
+from data import CustomClipDataset, EPICTarDataset, EPICDataset
 from torch.utils.data import DataLoader
 from torch import nn
+from torchvision import transforms
+
 
 tl.set_backend('pytorch')
 
@@ -123,10 +126,18 @@ def extract_settings_from_args(args: argparse.Namespace) -> Dict[str, Any]:
     return settings
 
 
-def preprocess_epic(preprocessor, segment_count):
-    train_X, train_Y = preprocessor.get_train(segment_count)
+def preprocess_epic(ratio, preprocessor, segment_count):
+    train, val, test = preprocessor.split_annotations(ratio, 0)
+    train_X, train_Y = preprocessor.get_split(train, segment_count)
+    val_X, val_Y = preprocessor.get_split(val, segment_count)
+    test_X, test_Y = preprocessor.get_split(test, segment_count)
     preprocessor.save_to_pt('train_X.pt', train_X)
     preprocessor.save_to_pt('train_Y.pt', train_Y)
+    preprocessor.save_to_pt('val_X.pt', val_X)
+    preprocessor.save_to_pt('val_Y.pt', val_Y)
+    preprocessor.save_to_pt('test_X.pt', test_X)
+    preprocessor.save_to_pt('test_Y.pt', test_Y)
+
 
 def compute_accuracy(y, y_hat):
     assert len(y) == len(y_hat)
@@ -156,16 +167,24 @@ def main(args):
         channel_dim = args.flow_length * 2
     else:
         raise ValueError(f"Unknown modality {args.modality}")
-    preprocessor = data.Preprocessor('C:/Users/SAM/EPIC-KITCHENS',
-                                 'C:/Users/SAM/Documents/GitHub/epic-kitchens-100-annotations',
-                                 'C:/Users/SAM/Documents/GitHub/egocentric-compressed-learning/data')
-    """ preprocessor = data.Preprocessor('/home/hiraeth/EPIC-KITCHENS',
+    
+    dataset = EPICDataset('C:/Users/SAM/EPIC-KITCHENS', pd.read_csv('annotations/EPIC.csv'), 
+                                 transforms.Compose([transforms.PILToTensor(), transforms.Resize((224, 224))]),
+                                 8)
+    train_dataloader = DataLoader(dataset=dataset, batch_size=args.batch_size, shuffle=True)
+
+    
+
+    """ preprocessor = data.Preprocessor('C:/Users/SAM/EPIC-KITCHENS',
+                                 'annotations',
+                                 'data')
+    preprocessor = data.Preprocessor('/home/hiraeth/EPIC-KITCHENS',
                                '/home/hiraeth/Github/epic-kitchens-100-annotations',
                                '/home/hiraeth/Github/egocentric-compressed-learning/data') """
     #preprocess_epic(data_loader)
-    train_X, train_Y = preprocessor.load_from_pt('train_X.pt').float(), preprocessor.load_from_pt('train_Y.pt')
+    """ train_X, train_Y = preprocessor.load_from_pt('train_X.pt').float(), preprocessor.load_from_pt('train_Y.pt')
     train_dataset = CustomClipDataset(dataset=(train_X, train_Y))
-    train_dataloader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True)
+    train_dataloader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True) """
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
 
@@ -188,15 +207,15 @@ def main(args):
             with torch.no_grad():
                 print("Batch accuracy: ", compute_accuracy(y[:, 0], torch.argmax(verb_output, dim=-1)))
 
-    print("Total accuracy: ", compute_accuracy(train_Y[:10, 0].to(DEVICE), torch.argmax(model(train_X[:10].to(DEVICE))[0], dim=-1)))
+    #print("Total accuracy: ", compute_accuracy(train_Y[:10, 0].to(DEVICE), torch.argmax(model(train_X[:10].to(DEVICE))[0], dim=-1)))
 
-    #torchvision.transforms.functional.to_pil_image(input[0][3]).show()
-    #M1 = compress.random_bernoulli_matrix((100, 224))
-    #M2 = compress.random_bernoulli_matrix((100, 224))
-    #compressed_clip = compress.compress_tensor(input[0], [M1, M2], [3, 2])
-    #torchvision.transforms.functional.to_pil_image(compressed_clip[3]).show()
-    #input[0] = compress.expand_tensor(compressed_clip, [M1.T, M2.T], [3, 2])
-    #torchvision.transforms.functional.to_pil_image(clips[0][3]).show()
+    """ torchvision.transforms.functional.to_pil_image(input[0][3]).show()
+    M1 = compress.random_bernoulli_matrix((100, 224))
+    M2 = compress.random_bernoulli_matrix((100, 224))
+    compressed_clip = compress.compress_tensor(input[0], [M1, M2], [3, 2])
+    torchvision.transforms.functional.to_pil_image(compressed_clip[3]).show()
+    input[0] = compress.expand_tensor(compressed_clip, [M1.T, M2.T], [3, 2])
+    torchvision.transforms.functional.to_pil_image(clips[0][3]).show() """
 
 if __name__ == "__main__":
     main(parser.parse_args())
