@@ -173,8 +173,6 @@ def main(args):
                                  8)
     train_dataloader = DataLoader(dataset=dataset, batch_size=args.batch_size, shuffle=True)
 
-    
-
     """ preprocessor = data.Preprocessor('C:/Users/SAM/EPIC-KITCHENS',
                                  'annotations',
                                  'data')

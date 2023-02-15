@@ -27,6 +27,7 @@ class CustomClipDataset(Dataset):
 class EPICDataset(Dataset):
   def __init__(self, dataset_path, annotations, transform, num_segments):
     self.dataset_path = dataset_path
+    # TODO Change this when I have access to whole dataset.
     self.annotations = annotations[:329]
     self.transform = transform
     self.num_segments = num_segments
@@ -46,32 +47,6 @@ class EPICDataset(Dataset):
     frames = torch.stack(list(map(lambda x: self.transform(Image.open(
             f'{self.dataset_path}/{participant_id}/rgb_frames/{video_id}/frame_{x}.jpg')), file_names)))
     return frames.float(), self.annotations.loc[:, ['verb_class', 'noun_class']].values[index]
-
-  def __len__(self):
-    return len(self.annotations)
-
-class EPICTarDataset(Dataset):
-  def __init__(self, dataset_path, annotations, transform, num_segments):
-    self.dataset_path = dataset_path
-    self.annotations = annotations
-    self.transform = transform
-    self.num_segments = num_segments
-
-  def __getitem__(self, index):
-    participant_id = self.annotations.at[index, 'participant_id']
-    video_id = self.annotations.at[index, 'video_id']
-    start_frame = self.annotations.at[index, 'start_frame']
-    stop_frame = self.annotations.at[index, 'stop_frame']
-    zero = '0'
-    segments = np.array_split(
-            np.arange(start_frame, stop_frame + 1), self.num_segments)
-    snippets = list(
-        map(lambda x: str(np.random.default_rng().choice(x)), segments))
-    file_names = list(
-        map(lambda x: f'{(10 - len(x)) * zero}{x}', snippets))
-    with tarfile.open(f'{self.dataset_path}/{participant_id}/rgb_frames/{video_id}.tar') as tf:
-        frames = torch.stack(list(map(lambda x: self.transform(Image.open(tf.extractfile(tf.getmember(f'./frame_{x}.jpg')))), file_names)))
-    return frames, self.annotations.loc[:, ['verb_class', 'noun_class']].values
 
   def __len__(self):
     return len(self.annotations)
@@ -100,8 +75,6 @@ class Preprocessor:
         frames = torch.stack(list(map(lambda x: transform(Image.open(
             f'{self.dataset_path}/{participant_id}/rgb_frames/{video_id}/frame_{x}.jpg')), file_names)))
         return frames
-
-    # TODO Change this to read in entire training set when I have it on hand.
 
     def get_split(self, split, num_segments):
         annotations = self.split.loc[:, ['participant_id', 'video_id', 'start_frame', 'stop_frame']].values
