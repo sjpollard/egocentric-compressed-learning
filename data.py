@@ -3,8 +3,6 @@ import pandas as pd
 import tensorly as tl
 import torch
 import os
-import tarfile
-import io
 from torchvision import transforms
 from PIL import Image
 from torch.utils.data import Dataset
@@ -12,7 +10,7 @@ from sklearn.model_selection import train_test_split
 
 tl.set_backend('pytorch')
 
-class CustomClipDataset(Dataset):
+class PreprocessedEPICDataset(Dataset):
   def __init__(self, dataset):
     assert dataset[0].size(0) == dataset[1].size(0)
     self.x = dataset[0]
@@ -24,7 +22,7 @@ class CustomClipDataset(Dataset):
   def __len__(self):
     return self.x.size(0)
 
-class EPICDataset(Dataset):
+class PostprocessedEPICDataset(Dataset):
   def __init__(self, dataset_path, annotations, transform, num_segments):
     self.dataset_path = dataset_path
     # TODO Change this when I have access to whole dataset.
@@ -54,7 +52,7 @@ class EPICDataset(Dataset):
 class Preprocessor:
     def __init__(self, dataset_path, annotations_path, data_path):
         self.dataset_path = dataset_path
-        self.epic_annotations = pd.read_csv(
+        self.annotations = pd.read_csv(
             f'{annotations_path}/EPIC.csv')
         self.data_path = data_path
         
@@ -77,17 +75,16 @@ class Preprocessor:
         return frames
 
     def get_split(self, split, num_segments):
-        annotations = self.split.loc[:, ['participant_id', 'video_id', 'start_frame', 'stop_frame']].values
+        annotations = split.loc[:, ['participant_id', 'video_id', 'start_frame', 'stop_frame']].values
         split_X = torch.stack(
             list(map(lambda x: self.get_annotation_snippets(x, num_segments), annotations)))
-        split_Y = torch.tensor(self.split.loc[:, ['verb_class', 'noun_class']].values)
+        split_Y = torch.tensor(split.loc[:, ['verb_class', 'noun_class']].values)
         return split_X, split_Y
 
-    def split_annotations(self, ratio, seed):
+    def split_annotations(self, num_annotations, ratio, seed):
         train_size = ratio[0]/100.0
-        train, temp = train_test_split(self.epic_annotations, train_size=train_size , random_state=seed)
+        train, temp = train_test_split(self.annotations[:num_annotations], train_size=train_size , random_state=seed)
         val_size = (ratio[1]/100.0) / (ratio[1]/100.0 + ratio[2]/100.0)
-        print(train_size, val_size)
         val, test = train_test_split(temp, train_size=val_size, random_state=seed)
         return train, val, test
     

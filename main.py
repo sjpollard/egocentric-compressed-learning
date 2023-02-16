@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import argparse
 import logging
-from pyexpat import model
 import sys
 
 from pathlib import Path
@@ -9,26 +8,23 @@ from typing import Any, Dict
 
 import torch
 import tensorly as tl
-import torchvision
-import compress
 import data
-import pandas as pd
 
 from model_loader import load_checkpoint, make_model
-from data import CustomClipDataset, EPICTarDataset, EPICDataset
+from data import PreprocessedEPICDataset
 from torch.utils.data import DataLoader
-from torch import nn
-from torchvision import transforms
+from torch import nn, optim
+from torch.optim.optimizer import Optimizer
 
 
 tl.set_backend('pytorch')
 
-#torch.backends.cudnn.benchmark = True
+torch.backends.cudnn.benchmark = True
 
 if torch.cuda.is_available():
     DEVICE = torch.device('cuda')
 else:
-    DEVICE = torch.device('cuda')
+    DEVICE = torch.device('cpu')
 
 parser = argparse.ArgumentParser(
     description="Test the instantiation and forward pass of models",
@@ -109,6 +105,8 @@ parser.add_argument(
 parser.add_argument("--batch-size", default=10, type=int, help="Batch size")
 parser.add_argument("--epochs", default=10, type=int, help="Number of epochs to train")
 parser.add_argument("--lr", default=1e-2, type=float, help="Learning rate")
+parser.add_argument("--val-frequency", default=2, type=int, help="How frequently to test the model on the validation set in number of epochs")
+parser.add_argument("--print-frequency", default=10, type=int, help="How frequently to print progress to the command line in number of steps")
 parser.add_argument("--print-model", action="store_true", help="Print model definition")
 
 
@@ -126,23 +124,90 @@ def extract_settings_from_args(args: argparse.Namespace) -> Dict[str, Any]:
     return settings
 
 
-def preprocess_epic(ratio, preprocessor, segment_count):
-    train, val, test = preprocessor.split_annotations(ratio, 0)
+def preprocess_epic(label, num_annotations, ratio, preprocessor, segment_count):
+    train, val, test = preprocessor.split_annotations(num_annotations, ratio, 0)
     train_X, train_Y = preprocessor.get_split(train, segment_count)
+    preprocessor.save_to_pt(f'{label}_train_X.pt', train_X)
+    preprocessor.save_to_pt(f'{label}_train_Y.pt', train_Y)
     val_X, val_Y = preprocessor.get_split(val, segment_count)
+    preprocessor.save_to_pt(f'{label}_val_X.pt', val_X)
+    preprocessor.save_to_pt(f'{label}_val_Y.pt', val_Y)
     test_X, test_Y = preprocessor.get_split(test, segment_count)
-    preprocessor.save_to_pt('train_X.pt', train_X)
-    preprocessor.save_to_pt('train_Y.pt', train_Y)
-    preprocessor.save_to_pt('val_X.pt', val_X)
-    preprocessor.save_to_pt('val_Y.pt', val_Y)
-    preprocessor.save_to_pt('test_X.pt', test_X)
-    preprocessor.save_to_pt('test_Y.pt', test_Y)
+    preprocessor.save_to_pt(f'{label}_test_X.pt', test_X)
+    preprocessor.save_to_pt(f'{label}_test_Y.pt', test_Y)
 
 
 def compute_accuracy(y, y_hat):
     assert len(y) == len(y_hat)
     return float((y == y_hat).sum()) / len(y)
 
+
+class Trainer:
+    def __init__(self, 
+                 model: nn.Module, 
+                 train_dataloader: DataLoader, 
+                 val_dataloader: DataLoader, 
+                 criterion: nn.Module, 
+                 optimizer: Optimizer):
+        self.model = model.to(DEVICE)
+        self.train_dataloader = train_dataloader
+        self.val_dataloader = val_dataloader
+        self.criterion = criterion
+        self.optimizer = optimizer
+        self.step = 0
+    
+    def train(self, epochs, val_frequency, print_frequency):
+        self.model.train()
+        for epoch in range(epochs):
+            self.model.train()
+            for x, y in self.train_dataloader:
+                x = x.float().to(DEVICE)
+                y = y.to(DEVICE)
+                verb_output,_ = self.model(x)
+                loss = self.criterion(verb_output, y[:, 0])
+                loss.backward()
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+                with torch.no_grad():
+                   y_hat = torch.argmax(verb_output, dim=-1)
+                   accuracy = compute_accuracy(y[:, 0], y_hat)
+                if ((self.step + 1) % print_frequency) == 0:
+                    self.print_metrics(epoch, accuracy, loss)
+                self.step += 1
+            if ((epoch + 1) % val_frequency) == 0:
+                self.validate()
+                self.model.train()
+    
+    def validate(self):
+        self.model.eval()
+        total_loss = 0
+        ys = torch.empty(self.val_dataloader.batch_size).to(DEVICE)
+        y_hats = torch.empty(self.val_dataloader.batch_size).to(DEVICE)
+        with torch.no_grad():
+            for x, y in self.val_dataloader:
+                x = x.float().to(DEVICE)
+                y = y.to(DEVICE)
+                verb_output, _ = self.model(x)
+                loss = self.criterion(verb_output, y[:, 0])
+                total_loss += loss.item()
+                y_hat = torch.argmax(verb_output, dim=-1)
+                ys = torch.cat((ys, y[:, 0]))
+                y_hats = torch.cat((y_hats, y_hat))
+
+        accuracy = compute_accuracy(ys, y_hats)
+
+        average_loss = total_loss / len(self.val_dataloader)
+
+        print(f"validation loss: {average_loss:.5f}, accuracy: {accuracy * 100:2.2f}")
+
+    def print_metrics(self, epoch, accuracy, loss):
+        epoch_step = self.step % len(self.train_dataloader)
+        print(
+                f"epoch: [{epoch}], "
+                f"step: [{epoch_step}/{len(self.train_dataloader)}], "
+                f"batch loss: {loss:.5f}, "
+                f"batch accuracy: {accuracy * 100:2.2f}, "
+        )
 
 def main(args):
     logging.basicConfig(level=logging.INFO)
@@ -168,44 +233,31 @@ def main(args):
     else:
         raise ValueError(f"Unknown modality {args.modality}")
     
-    dataset = EPICDataset('C:/Users/SAM/EPIC-KITCHENS', pd.read_csv('annotations/EPIC.csv'), 
+    """ dataset = PostprocessedEPICDataset('C:/Users/SAM/EPIC-KITCHENS', pd.read_csv('annotations/EPIC.csv'), 
                                  transforms.Compose([transforms.PILToTensor(), transforms.Resize((224, 224))]),
                                  8)
-    train_dataloader = DataLoader(dataset=dataset, batch_size=args.batch_size, shuffle=True)
+    train_dataloader = DataLoader(dataset=dataset, batch_size=args.batch_size, shuffle=True) """
 
-    """ preprocessor = data.Preprocessor('C:/Users/SAM/EPIC-KITCHENS',
+    preprocessor = data.Preprocessor('B:/EPIC-KITCHENS',
                                  'annotations',
                                  'data')
-    preprocessor = data.Preprocessor('/home/hiraeth/EPIC-KITCHENS',
+    """ preprocessor = data.Preprocessor('/home/hiraeth/EPIC-KITCHENS',
                                '/home/hiraeth/Github/epic-kitchens-100-annotations',
                                '/home/hiraeth/Github/egocentric-compressed-learning/data') """
-    #preprocess_epic(data_loader)
-    """ train_X, train_Y = preprocessor.load_from_pt('train_X.pt').float(), preprocessor.load_from_pt('train_Y.pt')
-    train_dataset = CustomClipDataset(dataset=(train_X, train_Y))
-    train_dataloader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True) """
+    #preprocess_epic('P01_P02', 6215, (80, 10, 10), preprocessor, 8)
+
+    train_X, train_Y = preprocessor.load_from_pt('P01_P02_train_X.pt'), preprocessor.load_from_pt('P01_P02_train_Y.pt')
+    val_X, val_Y = preprocessor.load_from_pt('P01_P02_val_X.pt'), preprocessor.load_from_pt('P01_P02_val_Y.pt')
+    train_dataset = PreprocessedEPICDataset(dataset=(train_X, train_Y))
+    val_dataset = PreprocessedEPICDataset(dataset=(val_X, val_Y))
+    train_dataloader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True)
+    val_dataloader = DataLoader(dataset=val_dataset, batch_size=args.batch_size, shuffle=False)
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
+    optimizer = optim.SGD(model.parameters(), lr=args.lr)
 
-    model.to(DEVICE)
-    model.train()
-    for epoch in range(args.epochs):
-        print("Epoch: ", epoch)
-        model.train()
-        i = 0
-        for x, y in train_dataloader:
-            if i % 10 == 0 : print("Batch: ", i)
-            x = x.to(DEVICE)
-            y = y.to(DEVICE)
-            verb_output,_ = model(x)
-            verb_loss = criterion(verb_output, y[:, 0])
-            verb_loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
-            i += 1
-            with torch.no_grad():
-                print("Batch accuracy: ", compute_accuracy(y[:, 0], torch.argmax(verb_output, dim=-1)))
+    trainer = Trainer(model, train_dataloader, val_dataloader, criterion, optimizer)
 
-    #print("Total accuracy: ", compute_accuracy(train_Y[:10, 0].to(DEVICE), torch.argmax(model(train_X[:10].to(DEVICE))[0], dim=-1)))
+    trainer.train(args.epochs, args.val_frequency, args.print_frequency)
 
     """ torchvision.transforms.functional.to_pil_image(input[0][3]).show()
     M1 = compress.random_bernoulli_matrix((100, 224))
