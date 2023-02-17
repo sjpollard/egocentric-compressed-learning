@@ -104,7 +104,7 @@ parser.add_argument(
 )
 parser.add_argument("--batch-size", default=10, type=int, help="Batch size")
 parser.add_argument("--epochs", default=10, type=int, help="Number of epochs to train")
-parser.add_argument("--lr", default=1e-2, type=float, help="Learning rate")
+parser.add_argument("--lr", default=1e-3, type=float, help="Learning rate")
 parser.add_argument("--val-frequency", default=2, type=int, help="How frequently to test the model on the validation set in number of epochs")
 parser.add_argument("--print-frequency", default=10, type=int, help="How frequently to print progress to the command line in number of steps")
 parser.add_argument("--print-model", action="store_true", help="Print model definition")
@@ -163,16 +163,20 @@ class Trainer:
             for x, y in self.train_dataloader:
                 x = x.float().to(DEVICE)
                 y = y.to(DEVICE)
-                verb_output,_ = self.model(x)
-                loss = self.criterion(verb_output, y[:, 0])
+                verb_output, noun_output = self.model(x)
+                verb_loss = self.criterion(verb_output, y[:, 0])
+                noun_loss = self.criterion(noun_output, y[:, 1])
+                loss = verb_loss + noun_loss
                 loss.backward()
                 self.optimizer.step()
                 self.optimizer.zero_grad()
                 with torch.no_grad():
-                   y_hat = torch.argmax(verb_output, dim=-1)
-                   accuracy = compute_accuracy(y[:, 0], y_hat)
+                    y_hat_verb = torch.argmax(verb_output, dim=-1)
+                    y_hat_noun = torch.argmax(noun_output, dim=-1)
+                    verb_accuracy = compute_accuracy(y[:, 0], y_hat_verb)
+                    noun_accuracy = compute_accuracy(y[:, 1], y_hat_noun)
                 if ((self.step + 1) % print_frequency) == 0:
-                    self.print_metrics(epoch, accuracy, loss)
+                    self.print_metrics(epoch, verb_accuracy, noun_accuracy, loss)
                 self.step += 1
             if ((epoch + 1) % val_frequency) == 0:
                 self.validate()
@@ -181,32 +185,41 @@ class Trainer:
     def validate(self):
         self.model.eval()
         total_loss = 0
-        ys = torch.empty(self.val_dataloader.batch_size).to(DEVICE)
-        y_hats = torch.empty(self.val_dataloader.batch_size).to(DEVICE)
+        ys_verb = torch.empty(self.val_dataloader.batch_size).to(DEVICE)
+        ys_noun = torch.empty(self.val_dataloader.batch_size).to(DEVICE)
+        y_hats_verb = torch.empty(self.val_dataloader.batch_size).to(DEVICE)
+        y_hats_noun = torch.empty(self.val_dataloader.batch_size).to(DEVICE)
         with torch.no_grad():
             for x, y in self.val_dataloader:
                 x = x.float().to(DEVICE)
                 y = y.to(DEVICE)
-                verb_output, _ = self.model(x)
-                loss = self.criterion(verb_output, y[:, 0])
+                verb_output, noun_output = self.model(x)
+                verb_loss = self.criterion(verb_output, y[:, 0])
+                noun_loss = self.criterion(noun_output, y[:, 1])
+                loss = verb_loss + noun_loss
                 total_loss += loss.item()
-                y_hat = torch.argmax(verb_output, dim=-1)
-                ys = torch.cat((ys, y[:, 0]))
-                y_hats = torch.cat((y_hats, y_hat))
+                y_hat_verb = torch.argmax(verb_output, dim=-1)
+                y_hat_noun = torch.argmax(noun_output, dim=-1)
+                ys_verb = torch.cat((ys_verb, y[:, 0]))
+                ys_noun = torch.cat((ys_noun, y[:, 1]))
+                y_hats_verb = torch.cat((y_hats_verb, y_hat_verb))
+                y_hats_noun = torch.cat((y_hats_noun, y_hat_noun))
 
-        accuracy = compute_accuracy(ys, y_hats)
+        verb_accuracy = compute_accuracy(ys_verb, y_hats_verb)
+        noun_accuracy = compute_accuracy(ys_noun, y_hats_noun)
 
         average_loss = total_loss / len(self.val_dataloader)
 
-        print(f"validation loss: {average_loss:.5f}, accuracy: {accuracy * 100:2.2f}")
+        print(f"validation loss: {average_loss:.5f}, verb accuracy: {verb_accuracy * 100:2.2f}, noun accuracy: {noun_accuracy * 100:2.2f}")
 
-    def print_metrics(self, epoch, accuracy, loss):
+    def print_metrics(self, epoch, verb_accuracy, noun_accuracy, loss):
         epoch_step = self.step % len(self.train_dataloader)
         print(
                 f"epoch: [{epoch}], "
                 f"step: [{epoch_step}/{len(self.train_dataloader)}], "
                 f"batch loss: {loss:.5f}, "
-                f"batch accuracy: {accuracy * 100:2.2f}, "
+                f"batch verb accuracy: {verb_accuracy * 100:2.2f}",
+                f"batch noun accuracy: {noun_accuracy * 100:2.2f}, "
         )
 
 def main(args):
