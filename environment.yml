@@ -1,4 +1,4 @@
-name: epic-models
+name: ecl
 channels:
   - conda-forge
   - pytorch
