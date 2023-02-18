@@ -10,6 +10,7 @@ dependencies:
   - pillow
   - pandas
   - tensorly
+  - wandb
   - pytorch
   - torchvision
   - pytorch-cuda=11.6

@@ -9,6 +9,7 @@ from typing import Any, Dict
 import torch
 import tensorly as tl
 import data
+import wandb
 
 from model_loader import load_checkpoint, make_model
 from data import PreprocessedEPICDataset
@@ -106,6 +107,7 @@ parser.add_argument("--batch-size", default=10, type=int, help="Batch size")
 parser.add_argument("--epochs", default=10, type=int, help="Number of epochs to train")
 parser.add_argument("--lr", default=1e-3, type=float, help="Learning rate")
 parser.add_argument("--val-frequency", default=2, type=int, help="How frequently to test the model on the validation set in number of epochs")
+parser.add_argument("--log-frequency", default=10, type=int, help="How frequently to save logs to wandb in number of steps",)
 parser.add_argument("--print-frequency", default=10, type=int, help="How frequently to print progress to the command line in number of steps")
 parser.add_argument("--print-model", action="store_true", help="Print model definition")
 
@@ -156,7 +158,7 @@ class Trainer:
         self.optimizer = optimizer
         self.step = 0
     
-    def train(self, epochs, val_frequency, print_frequency):
+    def train(self, epochs, val_frequency, log_frequency, print_frequency):
         self.model.train()
         for epoch in range(epochs):
             self.model.train()
@@ -175,8 +177,13 @@ class Trainer:
                     y_hat_noun = torch.argmax(noun_output, dim=-1)
                     verb_accuracy = compute_accuracy(y[:, 0], y_hat_verb)
                     noun_accuracy = compute_accuracy(y[:, 1], y_hat_noun)
+                if ((self.step + 1) % log_frequency) == 0:
+                    wandb.log({'train/verb-loss': verb_loss,
+                               'train/noun-loss': noun_loss, 
+                               'train/verb-accuracy': verb_accuracy, 
+                               'train/noun-accuracy': noun_accuracy})
                 if ((self.step + 1) % print_frequency) == 0:
-                    self.print_metrics(epoch, verb_accuracy, noun_accuracy, loss)
+                    self.print_metrics(epoch, verb_loss, noun_loss, verb_accuracy, noun_accuracy)
                 self.step += 1
             if ((epoch + 1) % val_frequency) == 0:
                 self.validate()
@@ -184,7 +191,8 @@ class Trainer:
     
     def validate(self):
         self.model.eval()
-        total_loss = 0
+        total_verb_loss = 0
+        total_noun_loss = 0
         ys_verb = torch.empty(self.val_dataloader.batch_size).to(DEVICE)
         ys_noun = torch.empty(self.val_dataloader.batch_size).to(DEVICE)
         y_hats_verb = torch.empty(self.val_dataloader.batch_size).to(DEVICE)
@@ -196,8 +204,8 @@ class Trainer:
                 verb_output, noun_output = self.model(x)
                 verb_loss = self.criterion(verb_output, y[:, 0])
                 noun_loss = self.criterion(noun_output, y[:, 1])
-                loss = verb_loss + noun_loss
-                total_loss += loss.item()
+                total_verb_loss += verb_loss.item()
+                total_noun_loss += noun_loss.item()
                 y_hat_verb = torch.argmax(verb_output, dim=-1)
                 y_hat_noun = torch.argmax(noun_output, dim=-1)
                 ys_verb = torch.cat((ys_verb, y[:, 0]))
@@ -208,16 +216,22 @@ class Trainer:
         verb_accuracy = compute_accuracy(ys_verb, y_hats_verb)
         noun_accuracy = compute_accuracy(ys_noun, y_hats_noun)
 
-        average_loss = total_loss / len(self.val_dataloader)
+        average_verb_loss = total_verb_loss / len(self.val_dataloader)
+        average_noun_loss = total_noun_loss / len(self.val_dataloader)
 
-        print(f"validation loss: {average_loss:.5f}, verb accuracy: {verb_accuracy * 100:2.2f}, noun accuracy: {noun_accuracy * 100:2.2f}")
+        wandb.log({'val/avg-verb-loss': average_verb_loss,
+                   'val/avg-noun-loss': average_noun_loss,
+                   'val/verb-accuracy': verb_accuracy, 
+                   'val/noun-accuracy': noun_accuracy})
+        print(f"validation: avg verb loss: {average_verb_loss:.5f}, avg noun loss: {average_noun_loss:.5f}, verb accuracy: {verb_accuracy * 100:2.2f}, noun accuracy: {noun_accuracy * 100:2.2f}")
 
-    def print_metrics(self, epoch, verb_accuracy, noun_accuracy, loss):
+    def print_metrics(self, epoch, verb_loss, noun_loss, verb_accuracy, noun_accuracy):
         epoch_step = self.step % len(self.train_dataloader)
         print(
                 f"epoch: [{epoch}], "
                 f"step: [{epoch_step}/{len(self.train_dataloader)}], "
-                f"batch loss: {loss:.5f}, "
+                f"batch verb loss: {verb_loss:.5f}, ",
+                f"batch noun loss: {noun_loss:.5f}, "
                 f"batch verb accuracy: {verb_accuracy * 100:2.2f}",
                 f"batch noun accuracy: {noun_accuracy * 100:2.2f}, "
         )
@@ -246,17 +260,15 @@ def main(args):
     else:
         raise ValueError(f"Unknown modality {args.modality}")
     
+    wandb.init(project="egocentric-compressed-learning", config=settings)
+
     """ dataset = PostprocessedEPICDataset('C:/Users/SAM/EPIC-KITCHENS', pd.read_csv('annotations/EPIC.csv'), 
                                  transforms.Compose([transforms.PILToTensor(), transforms.Resize((224, 224))]),
                                  8)
     train_dataloader = DataLoader(dataset=dataset, batch_size=args.batch_size, shuffle=True) """
 
-    preprocessor = data.Preprocessor('B:/EPIC-KITCHENS',
-                                 'annotations',
-                                 'data')
-    """ preprocessor = data.Preprocessor('/home/hiraeth/EPIC-KITCHENS',
-                               '/home/hiraeth/Github/epic-kitchens-100-annotations',
-                               '/home/hiraeth/Github/egocentric-compressed-learning/data') """
+    preprocessor = data.Preprocessor('B:/EPIC-KITCHENS', 'annotations', 'data')
+    
     #preprocess_epic('P01_P02', 6215, (80, 10, 10), preprocessor, 8)
 
     train_X, train_Y = preprocessor.load_from_pt('P01_P02_train_X.pt'), preprocessor.load_from_pt('P01_P02_train_Y.pt')
@@ -270,7 +282,7 @@ def main(args):
 
     trainer = Trainer(model, train_dataloader, val_dataloader, criterion, optimizer)
 
-    trainer.train(args.epochs, args.val_frequency, args.print_frequency)
+    trainer.train(args.epochs, args.val_frequency, args.log_frequency, args.print_frequency)
 
     """ torchvision.transforms.functional.to_pil_image(input[0][3]).show()
     M1 = compress.random_bernoulli_matrix((100, 224))
