@@ -10,12 +10,14 @@ import torch
 import tensorly as tl
 import data
 import wandb
+import pandas as pd
 
 from model_loader import load_checkpoint, make_model
-from data import PreprocessedEPICDataset
+from data import PreprocessedEPICDataset, PostprocessedEPICDataset
 from torch.utils.data import DataLoader
 from torch import nn, optim
 from torch.optim.optimizer import Optimizer
+from torchvision import transforms
 
 
 tl.set_backend('pytorch')
@@ -103,6 +105,43 @@ parser.add_argument(
     action="store_true",
     help="Gradually temporally pool throughout the network",
 )
+parser.add_argument(
+    "--load",
+    default="postprocessed",
+    choices=["preprocessed", "postprocessed"],
+    help="Whether the model loads from a preprocessed pytorch file created with data.py or postprocesses the input directly from EPIC-KITCHENS",
+)
+parser.add_argument(
+    "--dataset-path",
+    default="",
+    type=str,
+    help="Path to the EPIC-KITCHENS folder on the device"
+)
+parser.add_argument(
+    "--label",
+    default="EPIC",
+    type=str,
+    help="Label prepended to the pytorch data files"
+)
+parser.add_argument(
+    "--num-annotations",
+    default=1000,
+    type=int,
+    help="Number of annotations to take from the csv file"
+)
+parser.add_argument(
+    "--ratio",
+    nargs=3,
+    default=[80, 10, 10],
+    type=int,
+    help="Ratio of train/val/test splits respectively, input as space separated numbers that add to 100"
+)
+parser.add_argument(
+    "--seed",
+    default=0,
+    type=int,
+    help="Random seed used to generate train/val/test splits"
+)
 parser.add_argument("--batch-size", default=10, type=int, help="Batch size")
 parser.add_argument("--epochs", default=10, type=int, help="Number of epochs to train")
 parser.add_argument("--lr", default=1e-3, type=float, help="Learning rate")
@@ -124,19 +163,6 @@ def extract_settings_from_args(args: argparse.Namespace) -> Dict[str, Any]:
             settings[stripped_key] = settings[key]
             del settings[key]
     return settings
-
-
-def preprocess_epic(label, num_annotations, ratio, preprocessor, segment_count):
-    train, val, test = preprocessor.split_annotations(num_annotations, ratio, 0)
-    train_X, train_Y = preprocessor.get_split(train, segment_count)
-    preprocessor.save_to_pt(f'{label}_train_X.pt', train_X)
-    preprocessor.save_to_pt(f'{label}_train_Y.pt', train_Y)
-    val_X, val_Y = preprocessor.get_split(val, segment_count)
-    preprocessor.save_to_pt(f'{label}_val_X.pt', val_X)
-    preprocessor.save_to_pt(f'{label}_val_Y.pt', val_Y)
-    test_X, test_Y = preprocessor.get_split(test, segment_count)
-    preprocessor.save_to_pt(f'{label}_test_X.pt', test_X)
-    preprocessor.save_to_pt(f'{label}_test_Y.pt', test_Y)
 
 
 def compute_accuracy(y, y_hat):
@@ -223,17 +249,17 @@ class Trainer:
                    'val/avg-noun-loss': average_noun_loss,
                    'val/verb-accuracy': verb_accuracy, 
                    'val/noun-accuracy': noun_accuracy})
-        print(f"validation: avg verb loss: {average_verb_loss:.5f}, avg noun loss: {average_noun_loss:.5f}, verb accuracy: {verb_accuracy * 100:2.2f}, noun accuracy: {noun_accuracy * 100:2.2f}")
+        print(f"validation: avg verb loss: {average_verb_loss:.5f} avg noun loss: {average_noun_loss:.5f}, verb accuracy: {verb_accuracy * 100:2.2f} noun accuracy: {noun_accuracy * 100:2.2f}")
 
     def print_metrics(self, epoch, verb_loss, noun_loss, verb_accuracy, noun_accuracy):
         epoch_step = self.step % len(self.train_dataloader)
         print(
                 f"epoch: [{epoch}], "
                 f"step: [{epoch_step}/{len(self.train_dataloader)}], "
-                f"batch verb loss: {verb_loss:.5f}, ",
-                f"batch noun loss: {noun_loss:.5f}, "
+                f"batch verb loss: {verb_loss:.5f}",
+                f"batch noun loss: {noun_loss:.5f},"
                 f"batch verb accuracy: {verb_accuracy * 100:2.2f}",
-                f"batch noun accuracy: {noun_accuracy * 100:2.2f}, "
+                f"batch noun accuracy: {noun_accuracy * 100:2.2f} "
         )
 
 def main(args):
@@ -261,22 +287,32 @@ def main(args):
         raise ValueError(f"Unknown modality {args.modality}")
     
     wandb.init(project="egocentric-compressed-learning", config=settings)
-
-    """ dataset = PostprocessedEPICDataset('C:/Users/SAM/EPIC-KITCHENS', pd.read_csv('annotations/EPIC.csv'), 
-                                 transforms.Compose([transforms.PILToTensor(), transforms.Resize((224, 224))]),
-                                 8)
-    train_dataloader = DataLoader(dataset=dataset, batch_size=args.batch_size, shuffle=True) """
-
-    preprocessor = data.Preprocessor('B:/EPIC-KITCHENS', 'annotations', 'data')
     
-    #preprocess_epic('P01_P02', 6215, (80, 10, 10), preprocessor, 8)
+    dataprocessor = data.DataProcessor(args.dataset_path, 'annotations', 'data')
 
-    train_X, train_Y = preprocessor.load_from_pt('P01_P02_train_X.pt'), preprocessor.load_from_pt('P01_P02_train_Y.pt')
-    val_X, val_Y = preprocessor.load_from_pt('P01_P02_val_X.pt'), preprocessor.load_from_pt('P01_P02_val_Y.pt')
-    train_dataset = PreprocessedEPICDataset(dataset=(train_X, train_Y))
-    val_dataset = PreprocessedEPICDataset(dataset=(val_X, val_Y))
+    if args.load == 'preprocessed':
+        train_X, train_Y = dataprocessor.load_from_pt(f'{args.label}_train_X.pt'), dataprocessor.load_from_pt(f'{args.label}_train_Y.pt')
+        val_X, val_Y = dataprocessor.load_from_pt(f'{args.label}_val_X.pt'), dataprocessor.load_from_pt(f'{args.label}_val_Y.pt')
+        test_X, test_Y = dataprocessor.load_from_pt(f'{args.label}_test_X.pt'), dataprocessor.load_from_pt(f'{args.label}_test_Y.pt')
+        train_dataset = PreprocessedEPICDataset(dataset=(train_X, train_Y))
+        val_dataset = PreprocessedEPICDataset(dataset=(val_X, val_Y))
+        test_dataset = PreprocessedEPICDataset(dataset=(test_X, test_Y))
+    elif args.load == 'postprocessed':
+        train, val, test = dataprocessor.split_annotations(args.num_annotations, tuple(args.ratio), args.seed)
+        train_dataset = PostprocessedEPICDataset(args.dataset_path, train.reset_index(), 
+                                 transforms.Compose([transforms.PILToTensor(), transforms.Resize((224, 224))]),
+                                 args.segment_count)
+        val_dataset = PostprocessedEPICDataset(args.dataset_path, val.reset_index(), 
+                                 transforms.Compose([transforms.PILToTensor(), transforms.Resize((224, 224))]),
+                                 args.segment_count)
+        test_dataset = PostprocessedEPICDataset(args.dataset_path, test.reset_index(), 
+                                 transforms.Compose([transforms.PILToTensor(), transforms.Resize((224, 224))]),
+                                 args.segment_count)
+
     train_dataloader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True)
     val_dataloader = DataLoader(dataset=val_dataset, batch_size=args.batch_size, shuffle=False)
+    test_dataloader = DataLoader(dataset=test_dataset, batch_size=args.batch_size, shuffle=False)
+
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=args.lr)
 

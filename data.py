@@ -1,3 +1,5 @@
+import argparse
+
 import numpy as np
 import pandas as pd
 import tensorly as tl
@@ -9,6 +11,48 @@ from torch.utils.data import Dataset
 from sklearn.model_selection import train_test_split
 
 tl.set_backend('pytorch')
+
+parser = argparse.ArgumentParser(
+    description="Test the instantiation and forward pass of models",
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+)
+parser.add_argument(
+    "--label",
+    default="EPIC",
+    type=str,
+    help="Label prepended to the pytorch data files"
+)
+parser.add_argument(
+    "--num-annotations",
+    default=1000,
+    type=int,
+    help="Number of annotations to take from the csv file"
+)
+parser.add_argument(
+    "--ratio",
+    nargs=3,
+    default=[80, 10, 10],
+    type=int,
+    help="Ratio of train/val/test splits respectively, input as space separated numbers that add to 100"
+)
+parser.add_argument(
+    "--segment-count",
+    default=8,
+    type=int,
+    help="Number of segments to pull clips from"
+)
+parser.add_argument(
+    "--dataset-path",
+    default="",
+    type=str,
+    help="Path to the EPIC-KITCHENS folder on the device"
+)
+parser.add_argument(
+    "--seed",
+    default=0,
+    type=int,
+    help="Random seed used to generate train/val/test splits"
+)
 
 class PreprocessedEPICDataset(Dataset):
   def __init__(self, dataset):
@@ -25,8 +69,7 @@ class PreprocessedEPICDataset(Dataset):
 class PostprocessedEPICDataset(Dataset):
   def __init__(self, dataset_path, annotations, transform, num_segments):
     self.dataset_path = dataset_path
-    # TODO Change this when I have access to whole dataset.
-    self.annotations = annotations[:329]
+    self.annotations = annotations
     self.transform = transform
     self.num_segments = num_segments
 
@@ -49,7 +92,7 @@ class PostprocessedEPICDataset(Dataset):
   def __len__(self):
     return len(self.annotations)
 
-class Preprocessor:
+class DataProcessor:
     def __init__(self, dataset_path, annotations_path, data_path):
         self.dataset_path = dataset_path
         self.annotations = pd.read_csv(
@@ -95,3 +138,24 @@ class Preprocessor:
 
     def load_from_pt(self, filename):
         return torch.load(f'{self.data_path}/{filename}')
+
+def preprocess_epic(label, num_annotations, ratio, preprocessor, segment_count, seed):
+    train, val, test = preprocessor.split_annotations(num_annotations, ratio, seed)
+    train_X, train_Y = preprocessor.get_split(train.reset_index(), segment_count)
+    preprocessor.save_to_pt(f'{label}_train_X.pt', train_X)
+    preprocessor.save_to_pt(f'{label}_train_Y.pt', train_Y)
+    val_X, val_Y = preprocessor.get_split(val.reset_index(), segment_count)
+    preprocessor.save_to_pt(f'{label}_val_X.pt', val_X)
+    preprocessor.save_to_pt(f'{label}_val_Y.pt', val_Y)
+    test_X, test_Y = preprocessor.get_split(test.reset_index(), segment_count)
+    preprocessor.save_to_pt(f'{label}_test_X.pt', test_X)
+    preprocessor.save_to_pt(f'{label}_test_Y.pt', test_Y)
+
+def main(args):
+    preprocessor = DataProcessor(args.dataset_path, 'annotations', 'data')
+    preprocess_epic(args.label, args.num_annotations, tuple(args.ratio), preprocessor, args.segment_count, args.seed)
+   
+
+if __name__ == "__main__":
+    main(parser.parse_args())
+

@@ -24,10 +24,22 @@ python epic_downloader.py --rgb-frames --epic55-only
 
 ## Run
 
-Train the neural network with defaults
+If you want to preprocess EPIC-KITCHENS frames into pytorch files
 
 ```
-python main.py tsn
+python data.py --label test --num-annotations 1000 --ratio 80 10 10  --segment-count 8 --dataset-path path/to/EPIC-KITCHENS
+```
+
+Then train the neural network with defaults
+
+```
+python main.py tsn --load preprocessed --label test
+```
+
+If you want to postprocess EPIC-KITCHENS frames from the dataset
+
+```
+python main.py tsn --load postprocessed --dataset-path path/to/EPIC-KITCHENS --num-annotations 1000
 ```
 
 ## Arguments
