@@ -19,7 +19,6 @@ from torch import nn, optim
 from torch.optim.optimizer import Optimizer
 from torchvision import transforms
 
-
 tl.set_backend('pytorch')
 
 torch.backends.cudnn.benchmark = True
@@ -170,6 +169,32 @@ def compute_accuracy(y, y_hat):
     return float((y == y_hat).sum()) / len(y)
 
 
+def get_dataloaders(dataprocessor, args):
+    if args.load == 'preprocessed':
+        train_X, train_Y = dataprocessor.load_from_pt(f'{args.label}_train_X.pt'), dataprocessor.load_from_pt(f'{args.label}_train_Y.pt')
+        val_X, val_Y = dataprocessor.load_from_pt(f'{args.label}_val_X.pt'), dataprocessor.load_from_pt(f'{args.label}_val_Y.pt')
+        test_X, test_Y = dataprocessor.load_from_pt(f'{args.label}_test_X.pt'), dataprocessor.load_from_pt(f'{args.label}_test_Y.pt')
+        train_dataset = PreprocessedEPICDataset(dataset=(train_X, train_Y))
+        val_dataset = PreprocessedEPICDataset(dataset=(val_X, val_Y))
+        test_dataset = PreprocessedEPICDataset(dataset=(test_X, test_Y))
+    elif args.load == 'postprocessed':
+        train, val, test = dataprocessor.split_annotations(args.num_annotations, tuple(args.ratio), args.seed)
+        train_dataset = PostprocessedEPICDataset(args.dataset_path, train.reset_index(), 
+                                 transforms.Compose([transforms.PILToTensor(), transforms.Resize((224, 224))]),
+                                 args.segment_count)
+        val_dataset = PostprocessedEPICDataset(args.dataset_path, val.reset_index(), 
+                                 transforms.Compose([transforms.PILToTensor(), transforms.Resize((224, 224))]),
+                                 args.segment_count)
+        test_dataset = PostprocessedEPICDataset(args.dataset_path, test.reset_index(), 
+                                 transforms.Compose([transforms.PILToTensor(), transforms.Resize((224, 224))]),
+                                 args.segment_count)
+
+    train_dataloader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True)
+    val_dataloader = DataLoader(dataset=val_dataset, batch_size=args.batch_size, shuffle=False)
+    test_dataloader = DataLoader(dataset=test_dataset, batch_size=args.batch_size, shuffle=False)
+    
+    return train_dataloader, val_dataloader, test_dataloader
+
 class Trainer:
     def __init__(self, 
                  model: nn.Module, 
@@ -182,11 +207,11 @@ class Trainer:
         self.val_dataloader = val_dataloader
         self.criterion = criterion
         self.optimizer = optimizer
-        self.step = 0
+        self.step = 1
     
     def train(self, epochs, val_frequency, log_frequency, print_frequency):
         self.model.train()
-        for epoch in range(epochs):
+        for epoch in range(1, epochs + 1):
             self.model.train()
             for x, y in self.train_dataloader:
                 x = x.float().to(DEVICE)
@@ -203,26 +228,24 @@ class Trainer:
                     y_hat_noun = torch.argmax(noun_output, dim=-1)
                     verb_accuracy = compute_accuracy(y[:, 0], y_hat_verb)
                     noun_accuracy = compute_accuracy(y[:, 1], y_hat_noun)
-                if ((self.step + 1) % log_frequency) == 0:
+                if log_frequency != 0 and (self.step % log_frequency) == 0:
                     wandb.log({'train/verb-loss': verb_loss,
                                'train/noun-loss': noun_loss, 
                                'train/verb-accuracy': verb_accuracy, 
                                'train/noun-accuracy': noun_accuracy})
-                if ((self.step + 1) % print_frequency) == 0:
+                if (self.step % print_frequency) == 0:
                     self.print_metrics(epoch, verb_loss, noun_loss, verb_accuracy, noun_accuracy)
                 self.step += 1
-            if ((epoch + 1) % val_frequency) == 0:
-                self.validate()
+            if (epoch % val_frequency) == 0:
+                self.validate(log_frequency)
                 self.model.train()
     
-    def validate(self):
+    def validate(self, log_frequency):
         self.model.eval()
         total_verb_loss = 0
         total_noun_loss = 0
-        ys_verb = torch.empty(self.val_dataloader.batch_size).to(DEVICE)
-        ys_noun = torch.empty(self.val_dataloader.batch_size).to(DEVICE)
-        y_hats_verb = torch.empty(self.val_dataloader.batch_size).to(DEVICE)
-        y_hats_noun = torch.empty(self.val_dataloader.batch_size).to(DEVICE)
+        ys = []
+        y_hats = []
         with torch.no_grad():
             for x, y in self.val_dataloader:
                 x = x.float().to(DEVICE)
@@ -234,30 +257,32 @@ class Trainer:
                 total_noun_loss += noun_loss.item()
                 y_hat_verb = torch.argmax(verb_output, dim=-1)
                 y_hat_noun = torch.argmax(noun_output, dim=-1)
-                ys_verb = torch.cat((ys_verb, y[:, 0]))
-                ys_noun = torch.cat((ys_noun, y[:, 1]))
-                y_hats_verb = torch.cat((y_hats_verb, y_hat_verb))
-                y_hats_noun = torch.cat((y_hats_noun, y_hat_noun))
-
-        verb_accuracy = compute_accuracy(ys_verb, y_hats_verb)
-        noun_accuracy = compute_accuracy(ys_noun, y_hats_noun)
+                ys.append(y)
+                y_hats.append(torch.stack((y_hat_verb, y_hat_noun), 1))
+                
+        ys = torch.cat(ys)
+        y_hats = torch.cat(y_hats)
+        verb_accuracy = compute_accuracy(ys[:, 0], y_hats[:, 0])
+        noun_accuracy = compute_accuracy(ys[:, 1], y_hats[:, 1])
 
         average_verb_loss = total_verb_loss / len(self.val_dataloader)
         average_noun_loss = total_noun_loss / len(self.val_dataloader)
 
-        wandb.log({'val/avg-verb-loss': average_verb_loss,
-                   'val/avg-noun-loss': average_noun_loss,
-                   'val/verb-accuracy': verb_accuracy, 
-                   'val/noun-accuracy': noun_accuracy})
+        if (log_frequency != 0):
+            wandb.log({'val/avg-verb-loss': average_verb_loss,
+                    'val/avg-noun-loss': average_noun_loss,
+                    'val/verb-accuracy': verb_accuracy, 
+                    'val/noun-accuracy': noun_accuracy})
         print(f"validation: avg verb loss: {average_verb_loss:.5f} avg noun loss: {average_noun_loss:.5f}, verb accuracy: {verb_accuracy * 100:2.2f} noun accuracy: {noun_accuracy * 100:2.2f}")
 
     def print_metrics(self, epoch, verb_loss, noun_loss, verb_accuracy, noun_accuracy):
         epoch_step = self.step % len(self.train_dataloader)
+        if epoch_step == 0: epoch_step = len(self.train_dataloader)
         print(
                 f"epoch: [{epoch}], "
                 f"step: [{epoch_step}/{len(self.train_dataloader)}], "
                 f"batch verb loss: {verb_loss:.5f}",
-                f"batch noun loss: {noun_loss:.5f},"
+                f"batch noun loss: {noun_loss:.5f}, "
                 f"batch verb accuracy: {verb_accuracy * 100:2.2f}",
                 f"batch noun accuracy: {noun_accuracy * 100:2.2f} "
         )
@@ -286,39 +311,20 @@ def main(args):
     else:
         raise ValueError(f"Unknown modality {args.modality}")
     
-    wandb.init(project="egocentric-compressed-learning", config=settings)
+    if args.log_frequency != 0:
+        wandb.init(project="egocentric-compressed-learning", config=settings)
     
     dataprocessor = data.DataProcessor(args.dataset_path, 'annotations', 'data')
 
-    if args.load == 'preprocessed':
-        train_X, train_Y = dataprocessor.load_from_pt(f'{args.label}_train_X.pt'), dataprocessor.load_from_pt(f'{args.label}_train_Y.pt')
-        val_X, val_Y = dataprocessor.load_from_pt(f'{args.label}_val_X.pt'), dataprocessor.load_from_pt(f'{args.label}_val_Y.pt')
-        test_X, test_Y = dataprocessor.load_from_pt(f'{args.label}_test_X.pt'), dataprocessor.load_from_pt(f'{args.label}_test_Y.pt')
-        train_dataset = PreprocessedEPICDataset(dataset=(train_X, train_Y))
-        val_dataset = PreprocessedEPICDataset(dataset=(val_X, val_Y))
-        test_dataset = PreprocessedEPICDataset(dataset=(test_X, test_Y))
-    elif args.load == 'postprocessed':
-        train, val, test = dataprocessor.split_annotations(args.num_annotations, tuple(args.ratio), args.seed)
-        train_dataset = PostprocessedEPICDataset(args.dataset_path, train.reset_index(), 
-                                 transforms.Compose([transforms.PILToTensor(), transforms.Resize((224, 224))]),
-                                 args.segment_count)
-        val_dataset = PostprocessedEPICDataset(args.dataset_path, val.reset_index(), 
-                                 transforms.Compose([transforms.PILToTensor(), transforms.Resize((224, 224))]),
-                                 args.segment_count)
-        test_dataset = PostprocessedEPICDataset(args.dataset_path, test.reset_index(), 
-                                 transforms.Compose([transforms.PILToTensor(), transforms.Resize((224, 224))]),
-                                 args.segment_count)
-
-    train_dataloader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True)
-    val_dataloader = DataLoader(dataset=val_dataset, batch_size=args.batch_size, shuffle=False)
-    test_dataloader = DataLoader(dataset=test_dataset, batch_size=args.batch_size, shuffle=False)
+    train_dataloader, val_dataloader, test_dataloader = get_dataloaders(dataprocessor, args)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=args.lr)
 
     trainer = Trainer(model, train_dataloader, val_dataloader, criterion, optimizer)
 
-    trainer.train(args.epochs, args.val_frequency, args.log_frequency, args.print_frequency)
+    #trainer.train(args.epochs, args.val_frequency, args.log_frequency, args.print_frequency)
+    trainer.validate(args.log_frequency)
 
     """ torchvision.transforms.functional.to_pil_image(input[0][3]).show()
     M1 = compress.random_bernoulli_matrix((100, 224))

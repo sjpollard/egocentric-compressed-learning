@@ -55,42 +55,42 @@ parser.add_argument(
 )
 
 class PreprocessedEPICDataset(Dataset):
-  def __init__(self, dataset):
-    assert dataset[0].size(0) == dataset[1].size(0)
-    self.x = dataset[0]
-    self.y = dataset[1]
+    def __init__(self, dataset):
+        assert dataset[0].size(0) == dataset[1].size(0)
+        self.x = dataset[0]
+        self.y = dataset[1]
 
-  def __getitem__(self, index):
-    return self.x[index], self.y[index]
+    def __getitem__(self, index):
+        return self.x[index], self.y[index]
 
-  def __len__(self):
-    return self.x.size(0)
+    def __len__(self):
+        return self.x.size(0)
 
 class PostprocessedEPICDataset(Dataset):
-  def __init__(self, dataset_path, annotations, transform, num_segments):
-    self.dataset_path = dataset_path
-    self.annotations = annotations
-    self.transform = transform
-    self.num_segments = num_segments
+    def __init__(self, dataset_path, annotations, transform, num_segments):
+        self.dataset_path = dataset_path
+        self.annotations = annotations
+        self.transform = transform
+        self.num_segments = num_segments
 
-  def __getitem__(self, index):
-    participant_id = self.annotations.at[index, 'participant_id']
-    video_id = self.annotations.at[index, 'video_id']
-    start_frame = self.annotations.at[index, 'start_frame']
-    stop_frame = self.annotations.at[index, 'stop_frame']
-    zero = '0'
-    segments = np.array_split(
-            np.arange(start_frame, stop_frame + 1), self.num_segments)
-    snippets = list(
-        map(lambda x: str(np.random.default_rng().choice(x)), segments))
-    file_names = list(
-        map(lambda x: f'{(10 - len(x)) * zero}{x}', snippets))
-    frames = torch.stack(list(map(lambda x: self.transform(Image.open(
-            f'{self.dataset_path}/{participant_id}/rgb_frames/{video_id}/frame_{x}.jpg')), file_names)))
-    return frames.float(), self.annotations.loc[:, ['verb_class', 'noun_class']].values[index]
+    def __getitem__(self, index):
+        participant_id = self.annotations.at[index, 'participant_id']
+        video_id = self.annotations.at[index, 'video_id']
+        start_frame = self.annotations.at[index, 'start_frame']
+        stop_frame = self.annotations.at[index, 'stop_frame']
+        zero = '0'
+        segments = np.array_split(
+                np.arange(start_frame, stop_frame + 1), self.num_segments)
+        frames = []
+        for i in range(self.num_segments):
+            snippet = str(np.random.default_rng().choice(segments[i]))
+            file_name = f'{(10 - len(snippet)) * zero}{snippet}'
+            frame = self.transform(Image.open(f'{self.dataset_path}/{participant_id}/rgb_frames/{video_id}/frame_{file_name}.jpg'))
+            frames.append(frame)
+        return torch.stack(frames), self.annotations.loc[:, ['verb_class', 'noun_class']].values[index]
 
-  def __len__(self):
-    return len(self.annotations)
+    def __len__(self):
+        return len(self.annotations)
 
 class DataProcessor:
     def __init__(self, dataset_path, annotations_path, data_path):
@@ -109,13 +109,13 @@ class DataProcessor:
             [transforms.PILToTensor(), transforms.Resize((224, 224))])
         segments = np.array_split(
             np.arange(start_frame, stop_frame + 1), num_segments)
-        snippets = list(
-            map(lambda x: str(np.random.default_rng().choice(x)), segments))
-        file_names = list(
-            map(lambda x: f'{(10 - len(x)) * zero}{x}', snippets))
-        frames = torch.stack(list(map(lambda x: transform(Image.open(
-            f'{self.dataset_path}/{participant_id}/rgb_frames/{video_id}/frame_{x}.jpg')), file_names)))
-        return frames
+        frames = []
+        for i in range(self.num_segments):
+            snippet = str(np.random.default_rng().choice(segments[i]))
+            file_name = f'{(10 - len(snippet)) * zero}{snippet}'
+            frame = transform(Image.open(f'{self.dataset_path}/{participant_id}/rgb_frames/{video_id}/frame_{file_name}.jpg'))
+            frames.append(frame)
+        return torch.stack(frames)
 
     def get_split(self, split, num_segments):
         annotations = split.loc[:, ['participant_id', 'video_id', 'start_frame', 'stop_frame']].values
