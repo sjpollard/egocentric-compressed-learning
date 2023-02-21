@@ -16,7 +16,7 @@ Prepare anaconda environment, `mamba` also works
 conda env create -n ecl -f environment.yml
 ```
 
-Download frames from EPIC-KITCHENS
+Download and extract frames from EPIC-KITCHENS
 
 ```
 python epic_downloader.py --rgb-frames --epic55-only
@@ -27,7 +27,7 @@ python epic_downloader.py --rgb-frames --epic55-only
 If you want to preprocess EPIC-KITCHENS frames into pytorch files
 
 ```
-python data.py --label test --num-annotations 1000 --ratio 80 10 10  --segment-count 8 --dataset-path path/to/EPIC-KITCHENS
+python data.py --label test --num-annotations n --dataset-path path/to/EPIC-KITCHENS
 ```
 
 Then train the neural network with defaults
@@ -39,19 +39,36 @@ python main.py tsn --load preprocessed --label test
 If you want to postprocess EPIC-KITCHENS frames from the dataset
 
 ```
-python main.py tsn --load postprocessed --dataset-path path/to/EPIC-KITCHENS --num-annotations 1000
+python main.py tsn --load postprocessed --dataset-path path/to/EPIC-KITCHENS --num-annotations n
 ```
 
 ## Arguments
 
+### main.py
+
 - `model_type` (str): Only supports `'tsn'`
-- `epoch` (int): Number of training epochs
-- `segment_count` (int): Number of temporal segments to sample from
-- `batch_size` (int): Number of clips to train with at once
-- `lr` (float): Rate that the network learns at
-- `val_frequency` (int): Epochs until validation set is tested
-- `log_frequency` (int): Steps until logs are saved with `wandb`
-- `print_frequency` (int): Steps until training batch results are printed
+- `--load` (str): `'postprocessed'` or `'preprocessed'`
+- `--dataset-path` (str): Path to the EPIC-KITCHENS folder on the device
+- `--label` (str): Label prepended to preprocessed pytorch files
+- `--num-annotations` (int): Number of annotations to take from the csv file
+- `--ratio` (int tuple): Ratio of train/val/test splits respectively
+- `--seed` (int): Random seed used to generate train/val/test splits
+- `--epoch` (int): Number of training epochs
+- `--segment_count` (int): Number of temporal segments to sample from
+- `--batch_size` (int): Number of clips to train with at once
+- `--lr` (float): Rate that the network learns at
+- `--val_frequency` (int): Epochs until validation set is tested
+- `--log_frequency` (int): Steps until logs are saved with `wandb`
+- `--print_frequency` (int): Steps until training batch results are printed
+
+### data.py
+
+- `--dataset-path` (str): Path to the EPIC-KITCHENS folder on the device
+- `--label` (str): Label prepended to preprocessed pytorch files
+- `--num-annotations` (int): Number of annotations to take from the csv file
+- `--ratio` (int tuple): Ratio of train/val/test splits respectively
+- `--seed` (int): Random seed used to generate train/val/test splits
+- `--segment_count` (int): Number of temporal segments to sample from
 
 ## Acknowledgements
 This project borrows ideas and/or code from the following preceding works:

@@ -121,7 +121,7 @@ parser.add_argument(
     "--label",
     default="EPIC",
     type=str,
-    help="Label prepended to the pytorch data files"
+    help="Label prepended to preprocessed pytorch data files"
 )
 parser.add_argument(
     "--num-annotations",
