@@ -50,6 +50,8 @@ python main.py tsn --load postprocessed --dataset-path path/to/EPIC-KITCHENS --n
 - `--load` (str): `'postprocessed'` or `'preprocessed'`
 - `--dataset-path` (str): Path to the EPIC-KITCHENS folder on the device
 - `--label` (str): Label prepended to preprocessed pytorch files
+- `--measurements` (int tuple): Heights of measurement matrices
+- `--modes` (int tuple): Modes corresponding to measurement matrices
 - `--num-annotations` (int): Number of annotations to take from the csv file
 - `--ratio` (int tuple): Ratio of train/val/test splits respectively
 - `--seed` (int): Random seed used to generate train/val/test splits

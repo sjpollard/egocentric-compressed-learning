@@ -11,6 +11,7 @@ import tensorly as tl
 import data
 import wandb
 import pandas as pd
+import compress
 
 from model_loader import load_checkpoint, make_model
 from data import PreprocessedEPICDataset, PostprocessedEPICDataset
@@ -141,6 +142,20 @@ parser.add_argument(
     type=int,
     help="Random seed used to generate train/val/test splits"
 )
+parser.add_argument(
+    "--measurements", 
+    nargs='*',
+    default=None, 
+    type=int, 
+    help="Height of the measurement matrix for each mode of the input clip we're compressing"
+)
+parser.add_argument(
+    "--modes", 
+    nargs='*',
+    default=None, 
+    type=int, 
+    help="Corresponding modes of the input clip to compress with the measurement matrices"
+)
 parser.add_argument("--batch-size", default=10, type=int, help="Batch size")
 parser.add_argument("--epochs", default=10, type=int, help="Number of epochs to train")
 parser.add_argument("--lr", default=1e-3, type=float, help="Learning rate")
@@ -199,23 +214,26 @@ class Trainer:
     def __init__(self, 
                  model: nn.Module, 
                  train_dataloader: DataLoader, 
-                 val_dataloader: DataLoader, 
+                 val_dataloader: DataLoader,
+                 test_dataloader: DataLoader,
                  criterion: nn.Module, 
                  optimizer: Optimizer):
         self.model = model.to(DEVICE)
         self.train_dataloader = train_dataloader
         self.val_dataloader = val_dataloader
+        self.test_dataloader = test_dataloader
         self.criterion = criterion
         self.optimizer = optimizer
         self.step = 1
     
-    def train(self, epochs, val_frequency, log_frequency, print_frequency):
+    def train(self, epochs, measurements, modes, val_frequency, log_frequency, print_frequency):
         self.model.train()
         for epoch in range(1, epochs + 1):
             self.model.train()
             for x, y in self.train_dataloader:
                 x = x.float().to(DEVICE)
                 y = y.to(DEVICE)
+                if measurements != None: compress.process_batch(x, measurements, modes)
                 verb_output, noun_output = self.model(x)
                 verb_loss = self.criterion(verb_output, y[:, 0])
                 noun_loss = self.criterion(noun_output, y[:, 1])
@@ -237,19 +255,22 @@ class Trainer:
                     self.print_metrics(epoch, verb_loss, noun_loss, verb_accuracy, noun_accuracy)
                 self.step += 1
             if (epoch % val_frequency) == 0:
-                self.validate(log_frequency)
+                self.validate('val', log_frequency)
                 self.model.train()
     
-    def validate(self, log_frequency):
+    def validate(self, split, measurements, modes, log_frequency):
+        if split == 'val': split_dataloader = self.val_dataloader
+        elif split == 'test': split_dataloader = self.test_dataloader
         self.model.eval()
         total_verb_loss = 0
         total_noun_loss = 0
         ys = []
         y_hats = []
         with torch.no_grad():
-            for x, y in self.val_dataloader:
+            for x, y in split_dataloader:
                 x = x.float().to(DEVICE)
                 y = y.to(DEVICE)
+                if measurements != None: compress.process_batch(x, measurements, modes)
                 verb_output, noun_output = self.model(x)
                 verb_loss = self.criterion(verb_output, y[:, 0])
                 noun_loss = self.criterion(noun_output, y[:, 1])
@@ -265,15 +286,15 @@ class Trainer:
         verb_accuracy = compute_accuracy(ys[:, 0], y_hats[:, 0])
         noun_accuracy = compute_accuracy(ys[:, 1], y_hats[:, 1])
 
-        average_verb_loss = total_verb_loss / len(self.val_dataloader)
-        average_noun_loss = total_noun_loss / len(self.val_dataloader)
+        average_verb_loss = total_verb_loss / len(split_dataloader)
+        average_noun_loss = total_noun_loss / len(split_dataloader)
 
         if (log_frequency != 0):
-            wandb.log({'val/avg-verb-loss': average_verb_loss,
-                    'val/avg-noun-loss': average_noun_loss,
-                    'val/verb-accuracy': verb_accuracy, 
-                    'val/noun-accuracy': noun_accuracy})
-        print(f"validation: avg verb loss: {average_verb_loss:.5f} avg noun loss: {average_noun_loss:.5f}, verb accuracy: {verb_accuracy * 100:2.2f} noun accuracy: {noun_accuracy * 100:2.2f}")
+            wandb.log({f'{split}/avg-verb-loss': average_verb_loss,
+                    f'{split}/avg-noun-loss': average_noun_loss,
+                    f'{split}/verb-accuracy': verb_accuracy, 
+                    f'{split}/noun-accuracy': noun_accuracy})
+        print(f"{split}: avg verb loss: {average_verb_loss:.5f} avg noun loss: {average_noun_loss:.5f}, verb accuracy: {verb_accuracy * 100:2.2f} noun accuracy: {noun_accuracy * 100:2.2f}")
 
     def print_metrics(self, epoch, verb_loss, noun_loss, verb_accuracy, noun_accuracy):
         epoch_step = self.step % len(self.train_dataloader)
@@ -321,18 +342,10 @@ def main(args):
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=args.lr)
 
-    trainer = Trainer(model, train_dataloader, val_dataloader, criterion, optimizer)
+    trainer = Trainer(model, train_dataloader, val_dataloader, test_dataloader, criterion, optimizer)
 
-    #trainer.train(args.epochs, args.val_frequency, args.log_frequency, args.print_frequency)
-    trainer.validate(args.log_frequency)
-
-    """ torchvision.transforms.functional.to_pil_image(input[0][3]).show()
-    M1 = compress.random_bernoulli_matrix((100, 224))
-    M2 = compress.random_bernoulli_matrix((100, 224))
-    compressed_clip = compress.compress_tensor(input[0], [M1, M2], [3, 2])
-    torchvision.transforms.functional.to_pil_image(compressed_clip[3]).show()
-    input[0] = compress.expand_tensor(compressed_clip, [M1.T, M2.T], [3, 2])
-    torchvision.transforms.functional.to_pil_image(clips[0][3]).show() """
+    trainer.train(args.epochs, args.measurements, args.modes, args.val_frequency, args.log_frequency, args.print_frequency)
+    trainer.validate('test', args.measurements, args.modes, args.log_frequency)
 
 if __name__ == "__main__":
     main(parser.parse_args())
