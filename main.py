@@ -224,9 +224,9 @@ class Trainer:
         self.test_dataloader = test_dataloader
         self.criterion = criterion
         self.optimizer = optimizer
-        self.step = 1
     
     def train(self, epochs, measurements, modes, val_frequency, log_frequency, print_frequency):
+        self.step = 1
         self.model.train()
         for epoch in range(1, epochs + 1):
             self.model.train()
@@ -255,7 +255,7 @@ class Trainer:
                     self.print_metrics(epoch, verb_loss, noun_loss, verb_accuracy, noun_accuracy)
                 self.step += 1
             if (epoch % val_frequency) == 0:
-                self.validate('val', log_frequency)
+                self.validate('val', measurements, modes, log_frequency)
                 self.model.train()
     
     def validate(self, split, measurements, modes, log_frequency):
