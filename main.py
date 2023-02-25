@@ -14,11 +14,12 @@ import pandas as pd
 import compress
 
 from model_loader import load_checkpoint, make_model
-from data import PreprocessedEPICDataset, PostprocessedEPICDataset
+from data import NewPreprocessedEPICDataset, PreprocessedEPICDataset, PostprocessedEPICDataset
 from torch.utils.data import DataLoader
 from torch import nn, optim
 from torch.optim.optimizer import Optimizer
 from torchvision import transforms
+from timeit import default_timer as timer
 
 tl.set_backend('pytorch')
 
@@ -130,6 +131,12 @@ parser.add_argument(
     help="Number of annotations to take from the csv file"
 )
 parser.add_argument(
+    "--chunks",
+    default=1,
+    type=int,
+    help="Number of chunks to divide each split into when saving to pytorch file"
+)
+parser.add_argument(
     "--ratio",
     nargs=3,
     default=[80, 10, 10],
@@ -160,7 +167,7 @@ parser.add_argument("--batch-size", default=10, type=int, help="Batch size")
 parser.add_argument("--epochs", default=10, type=int, help="Number of epochs to train")
 parser.add_argument("--lr", default=1e-3, type=float, help="Learning rate")
 parser.add_argument("--val-frequency", default=2, type=int, help="How frequently to test the model on the validation set in number of epochs")
-parser.add_argument("--log-frequency", default=10, type=int, help="How frequently to save logs to wandb in number of steps",)
+parser.add_argument("--log-frequency", default=0, type=int, help="How frequently to save logs to wandb in number of steps",)
 parser.add_argument("--print-frequency", default=10, type=int, help="How frequently to print progress to the command line in number of steps")
 parser.add_argument("--print-model", action="store_true", help="Print model definition")
 
@@ -186,12 +193,12 @@ def compute_accuracy(y, y_hat):
 
 def get_dataloaders(dataprocessor, args):
     if args.load == 'preprocessed':
-        train_X, train_Y = dataprocessor.load_from_pt(f'{args.label}_train_X.pt'), dataprocessor.load_from_pt(f'{args.label}_train_Y.pt')
-        val_X, val_Y = dataprocessor.load_from_pt(f'{args.label}_val_X.pt'), dataprocessor.load_from_pt(f'{args.label}_val_Y.pt')
-        test_X, test_Y = dataprocessor.load_from_pt(f'{args.label}_test_X.pt'), dataprocessor.load_from_pt(f'{args.label}_test_Y.pt')
-        train_dataset = PreprocessedEPICDataset(dataset=(train_X, train_Y))
-        val_dataset = PreprocessedEPICDataset(dataset=(val_X, val_Y))
-        test_dataset = PreprocessedEPICDataset(dataset=(test_X, test_Y))
+        #train_X, train_Y = dataprocessor.load_from_pt(f'{args.label}_train_X.pt'), dataprocessor.load_from_pt(f'{args.label}_train_Y.pt')
+        #val_X, val_Y = dataprocessor.load_from_pt(f'{args.label}_val_X.pt'), dataprocessor.load_from_pt(f'{args.label}_val_Y.pt')
+        #test_X, test_Y = dataprocessor.load_from_pt(f'{args.label}_test_X.pt'), dataprocessor.load_from_pt(f'{args.label}_test_Y.pt')
+        train_dataset = NewPreprocessedEPICDataset(dataprocessor, args.label, args.chunks, 'train')
+        val_dataset = NewPreprocessedEPICDataset(dataprocessor, args.label, args.chunks, 'val')
+        test_dataset = NewPreprocessedEPICDataset(dataprocessor, args.label, args.chunks, 'test')
     elif args.load == 'postprocessed':
         train, val, test = dataprocessor.split_annotations(args.num_annotations, tuple(args.ratio), args.seed)
         train_dataset = PostprocessedEPICDataset(args.dataset_path, train.reset_index(), 

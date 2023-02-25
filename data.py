@@ -31,10 +31,10 @@ parser.add_argument(
     help="Number of annotations to take from the csv file"
 )
 parser.add_argument(
-    "--chunk-size",
-    default=4000,
+    "--chunks",
+    default=1,
     type=int,
-    help="Number of clips to process into each pytorch chunk file"
+    help="Number of chunks to divide each split into when saving to pytorch file"
 )
 parser.add_argument(
     "--ratio",
@@ -73,6 +73,34 @@ class PreprocessedEPICDataset(Dataset):
 
     def __len__(self):
         return self.x.size(0)
+    
+class NewPreprocessedEPICDataset(Dataset):
+    def __init__(self, dataprocessor, label, chunks, split_type):
+        self.dataprocessor = dataprocessor
+        self.label = label
+        self.chunks = chunks
+        self.split_type = split_type
+        self.length = 0
+        for i in range(1, chunks + 1):
+            self.length += dataprocessor.load_from_pt(label, f'{label}_{i}_{split_type}_Y.pt').size(0)
+        self.chunk_reference = {}
+        chunk_index = 1
+        for chunk in np.array_split(np.arange(self.length), chunks):
+            element_index = 0
+            for element in chunk:
+                self.chunk_reference.update({str(element): {'chunk_index': chunk_index,'element_index': element_index}})
+                element_index += 1
+            chunk_index += 1
+
+    def __getitem__(self, index):
+        chunk_index = self.chunk_reference[str(index)]['chunk_index']
+        element_index = self.chunk_reference[str(index)]['element_index']
+        x = self.dataprocessor.load_from_pt(self.label, f'{self.label}_{chunk_index}_{self.split_type}_X.pt')[element_index]
+        y = self.dataprocessor.load_from_pt(self.label, f'{self.label}_{chunk_index}_{self.split_type}_Y.pt')[element_index]
+        return x, y
+
+    def __len__(self):
+        return self.length
 
 class PostprocessedEPICDataset(Dataset):
     def __init__(self, dataset_path, annotations, transform, segment_count):
@@ -118,7 +146,7 @@ class DataProcessor:
         segments = np.array_split(
             np.arange(start_frame, stop_frame + 1), segment_count)
         frames = []
-        for i in range(self.segment_count):
+        for i in range(segment_count):
             snippet = str(np.random.default_rng().choice(segments[i]))
             file_name = f'{(10 - len(snippet)) * zero}{snippet}'
             frame = transform(Image.open(f'{self.dataset_path}/{participant_id}/rgb_frames/{video_id}/frame_{file_name}.jpg'))
@@ -139,40 +167,35 @@ class DataProcessor:
         val, test = train_test_split(temp, train_size=val_size, random_state=seed)
         return train, val, test
     
-    def save_to_pt(self, filename, tensor):
-        if not os.path.exists(self.data_path):
-            os.makedirs(self.data_path)
-        torch.save(tensor, f'{self.data_path}/{filename}')
+    def save_to_pt(self, label, filename, tensor):
+        if not os.path.exists(f'{self.data_path}/{label}'):
+            os.makedirs(f'{self.data_path}/{label}')
+        torch.save(tensor, f'{self.data_path}/{label}/{filename}')
 
-    def load_from_pt(self, filename):
-        return torch.load(f'{self.data_path}/{filename}')
+    def load_from_pt(self, label, filename):
+        return torch.load(f'{self.data_path}/{label}/{filename}')
 
-def preprocess_epic(label, num_annotations, chunk_size, ratio, preprocessor, segment_count, seed):
-    train, val, test = preprocessor.split_annotations(num_annotations, ratio, seed)
-    train_chunks = [train[i:i + chunk_size] for i in range(0, train.shape[0], chunk_size)]
-    i = 1
-    for chunk in train_chunks:
-        chunk_X, chunk_Y = preprocessor.get_split(chunk.reset_index(), segment_count)
-        preprocessor.save_to_pt(f'{label}_{i}_train_X.pt', chunk_X)
-        preprocessor.save_to_pt(f'{label}_{i}_train_Y.pt', chunk_Y)
-    val_chunks = [val[i:i + chunk_size] for i in range(0, val.shape[0], chunk_size)]
-    i=  0
-    for chunk in val_chunks:
-        chunk_X, chunk_Y = preprocessor.get_split(chunk.reset_index(), segment_count)
-        preprocessor.save_to_pt(f'{label}_{i}_val_X.pt', chunk_X)
-        preprocessor.save_to_pt(f'{label}_{i}_val_Y.pt', chunk_Y)
-    test_chunks = [test[i:i + chunk_size] for i in range(0, test.shape[0], chunk_size)]
-    i = 0
-    for chunk in test_chunks:
-        chunk_X, chunk_Y = preprocessor.get_split(chunk.reset_index(), segment_count)
-        preprocessor.save_to_pt(f'{label}_{i}_test_X.pt', chunk_X)
-        preprocessor.save_to_pt(f'{label}_{i}_test_Y.pt', chunk_Y)
+def preprocess_epic(label, num_annotations, chunks, ratio, dataprocessor, segment_count, seed):
+    train, val, test = dataprocessor.split_annotations(num_annotations, ratio, seed)
+    train_chunks = np.array_split(train, chunks)
+    for i in range(len(train_chunks)):
+        chunk_X, chunk_Y = dataprocessor.get_split(train_chunks[i].reset_index(), segment_count)
+        dataprocessor.save_to_pt(label, f'{label}_{i + 1}_train_X.pt', chunk_X)
+        dataprocessor.save_to_pt(label, f'{label}_{i + 1}_train_Y.pt', chunk_Y)
+    val_chunks = np.array_split(val, chunks)
+    for i in range(len(val_chunks)):
+        chunk_X, chunk_Y = dataprocessor.get_split(val_chunks[i].reset_index(), segment_count)
+        dataprocessor.save_to_pt(label, f'{label}_{i + 1}_val_X.pt', chunk_X)
+        dataprocessor.save_to_pt(label, f'{label}_{i + 1}_val_Y.pt', chunk_Y)
+    test_chunks = np.array_split(test, chunks)
+    for i in range(len(test_chunks)):
+        chunk_X, chunk_Y = dataprocessor.get_split(test_chunks[i].reset_index(), segment_count)
+        dataprocessor.save_to_pt(label, f'{label}_{i + 1}_test_X.pt', chunk_X)
+        dataprocessor.save_to_pt(label, f'{label}_{i + 1}_test_Y.pt', chunk_Y)
 
 def main(args):
-    if not os.path.exists(f'data/{args.label}'):
-        os.makedirs(f'data/{args.label}')
-    preprocessor = DataProcessor(args.dataset_path, 'annotations', 'data')
-    preprocess_epic(args.label, args.num_annotations, args.chunk_size, tuple(args.ratio), preprocessor, args.segment_count, args.seed)
+    dataprocessor = DataProcessor(args.dataset_path, 'annotations', 'data')
+    preprocess_epic(args.label, args.num_annotations, args.chunks, tuple(args.ratio), dataprocessor, args.segment_count, args.seed)
    
 
 if __name__ == "__main__":
