@@ -34,7 +34,7 @@ parser.add_argument(
     "--chunks",
     default=1,
     type=int,
-    help="Number of chunks to divide each split into when saving to pytorch file"
+    help="Number of evenly sized chunks in the preprocessed data set"
 )
 parser.add_argument(
     "--ratio",
@@ -47,7 +47,9 @@ parser.add_argument(
     "--segment-count",
     default=8,
     type=int,
-    help="Number of segments to pull clips from"
+    help="Number of segments. For RGB this corresponds to number of "
+    "frames, whereas for Flow, it is the number of points from "
+    "which a stack of (u, v) frames are sampled."
 )
 parser.add_argument(
     "--dataset-path",
@@ -63,18 +65,6 @@ parser.add_argument(
 )
 
 class PreprocessedEPICDataset(Dataset):
-    def __init__(self, dataset):
-        assert dataset[0].size(0) == dataset[1].size(0)
-        self.x = dataset[0]
-        self.y = dataset[1]
-
-    def __getitem__(self, index):
-        return self.x[index], self.y[index]
-
-    def __len__(self):
-        return self.x.size(0)
-    
-class NewPreprocessedEPICDataset(Dataset):
     def __init__(self, dataprocessor, label, chunks, split_type):
         self.dataprocessor = dataprocessor
         self.label = label

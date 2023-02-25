@@ -24,16 +24,16 @@ python epic_downloader.py --rgb-frames --epic55-only
 
 ## Run
 
-If you want to preprocess EPIC-KITCHENS frames into pytorch files
+If you want to preprocess EPIC-KITCHENS frames into chunked pytorch files
 
 ```
-python data.py --label test --dataset-path path/to/EPIC-KITCHENS --num-annotations n
+python data.py --label test --dataset-path path/to/EPIC-KITCHENS --num-annotations n --chunks c
 ```
 
 Then train the neural network with defaults
 
 ```
-python main.py tsn --load preprocessed --label test
+python main.py tsn --load preprocessed --label test --chunks c
 ```
 
 If you want to postprocess EPIC-KITCHENS frames from the dataset
@@ -42,17 +42,24 @@ If you want to postprocess EPIC-KITCHENS frames from the dataset
 python main.py tsn --load postprocessed --dataset-path path/to/EPIC-KITCHENS --num-annotations n
 ```
 
+To utilise compressed learning, input measurement matrix heights and corresponding modes
+
+```
+python main.py tsn --load preprocessed --label test --chunks c --measurements m1 m2 m3 m4 --modes 0 1 2 3
+```
+
 ## Arguments
 
 ### main.py
 
 - `model_type` (str): Only supports `'tsn'`
-- `--load` (str): `'postprocessed'` or `'preprocessed'`
+- `--load` (str): `'preprocessed'` or `'postprocessed'`
 - `--dataset-path` (str): Path to the EPIC-KITCHENS folder on the device
 - `--label` (str): Label prepended to preprocessed pytorch files
 - `--measurements` (int tuple): Heights of measurement matrices
 - `--modes` (int tuple): Modes corresponding to measurement matrices
 - `--num-annotations` (int): Number of annotations to take from the csv file
+- `--chunks` (int): Number of evenly sized chunks in the preprocessed data set
 - `--ratio` (int tuple): Ratio of train/val/test splits respectively
 - `--seed` (int): Random seed used to generate train/val/test splits
 - `--epoch` (int): Number of training epochs
@@ -68,6 +75,7 @@ python main.py tsn --load postprocessed --dataset-path path/to/EPIC-KITCHENS --n
 - `--dataset-path` (str): Path to the EPIC-KITCHENS folder on the device
 - `--label` (str): Label prepended to preprocessed pytorch files
 - `--num-annotations` (int): Number of annotations to take from the csv file
+- `--chunks` (int): Number of evenly sized chunks in the preprocessed data set
 - `--ratio` (int tuple): Ratio of train/val/test splits respectively
 - `--seed` (int): Random seed used to generate train/val/test splits
 - `--segment_count` (int): Number of temporal segments to sample from

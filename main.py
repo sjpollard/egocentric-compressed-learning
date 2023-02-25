@@ -108,7 +108,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--load",
-    default="postprocessed",
+    default="preprocessed",
     choices=["preprocessed", "postprocessed"],
     help="Whether the model loads from a preprocessed pytorch file created with data.py or postprocesses the input directly from EPIC-KITCHENS",
 )
@@ -134,7 +134,7 @@ parser.add_argument(
     "--chunks",
     default=1,
     type=int,
-    help="Number of chunks to divide each split into when saving to pytorch file"
+    help="Number of evenly sized chunks in the preprocessed data set"
 )
 parser.add_argument(
     "--ratio",
@@ -193,9 +193,6 @@ def compute_accuracy(y, y_hat):
 
 def get_dataloaders(dataprocessor, args):
     if args.load == 'preprocessed':
-        #train_X, train_Y = dataprocessor.load_from_pt(f'{args.label}_train_X.pt'), dataprocessor.load_from_pt(f'{args.label}_train_Y.pt')
-        #val_X, val_Y = dataprocessor.load_from_pt(f'{args.label}_val_X.pt'), dataprocessor.load_from_pt(f'{args.label}_val_Y.pt')
-        #test_X, test_Y = dataprocessor.load_from_pt(f'{args.label}_test_X.pt'), dataprocessor.load_from_pt(f'{args.label}_test_Y.pt')
         train_dataset = NewPreprocessedEPICDataset(dataprocessor, args.label, args.chunks, 'train')
         val_dataset = NewPreprocessedEPICDataset(dataprocessor, args.label, args.chunks, 'val')
         test_dataset = NewPreprocessedEPICDataset(dataprocessor, args.label, args.chunks, 'test')
