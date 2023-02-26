@@ -5,10 +5,6 @@ import math
 
 tl.set_backend('pytorch')
 
-if torch.cuda.is_available():
-    DEVICE = torch.device('cuda')
-else:
-    DEVICE = torch.device('cpu')
 
 def random_gaussian_matrix(shape):
     m = shape[0]
@@ -24,16 +20,7 @@ def random_bernoulli_matrix(shape):
     return torch.from_numpy(M).float()
 
 
-def process_batch(batch, measurements, modes):
+def process_batch(batch, phi_matrices, modes):
     for i in range(batch.size(0)):
-        phi_matrices = list(map(lambda x, y: random_bernoulli_matrix((x, batch[i].size(y))).to(DEVICE), measurements, modes))
         compressed = tl.tenalg.multi_mode_dot(batch[i], phi_matrices, modes)
         batch[i] = tl.tenalg.multi_mode_dot(compressed, phi_matrices, modes, transpose=True)
-
-
-def compress_tensor(X, phi_matrices, modes):
-    return tl.tenalg.multi_mode_dot(X, phi_matrices, modes)
-
-
-def expand_tensor(Y, theta_matrices, modes):
-    return tl.tenalg.multi_mode_dot(Y, theta_matrices, modes)

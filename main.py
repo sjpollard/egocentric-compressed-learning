@@ -14,7 +14,7 @@ import pandas as pd
 import compress
 
 from model_loader import load_checkpoint, make_model
-from data import NewPreprocessedEPICDataset, PreprocessedEPICDataset, PostprocessedEPICDataset
+from data import PreprocessedEPICDataset, PostprocessedEPICDataset
 from torch.utils.data import DataLoader
 from torch import nn, optim
 from torch.optim.optimizer import Optimizer
@@ -193,9 +193,9 @@ def compute_accuracy(y, y_hat):
 
 def get_dataloaders(dataprocessor, args):
     if args.load == 'preprocessed':
-        train_dataset = NewPreprocessedEPICDataset(dataprocessor, args.label, args.chunks, 'train')
-        val_dataset = NewPreprocessedEPICDataset(dataprocessor, args.label, args.chunks, 'val')
-        test_dataset = NewPreprocessedEPICDataset(dataprocessor, args.label, args.chunks, 'test')
+        train_dataset = PreprocessedEPICDataset(dataprocessor, args.label, args.chunks, 'train')
+        val_dataset = PreprocessedEPICDataset(dataprocessor, args.label, args.chunks, 'val')
+        test_dataset = PreprocessedEPICDataset(dataprocessor, args.label, args.chunks, 'test')
     elif args.load == 'postprocessed':
         train, val, test = dataprocessor.split_annotations(args.num_annotations, tuple(args.ratio), args.seed)
         train_dataset = PostprocessedEPICDataset(args.dataset_path, train.reset_index(), 
@@ -221,15 +221,19 @@ class Trainer:
                  val_dataloader: DataLoader,
                  test_dataloader: DataLoader,
                  criterion: nn.Module, 
-                 optimizer: Optimizer):
+                 optimizer: Optimizer,
+                 phi_matrices: list,
+                 modes: list):
         self.model = model.to(DEVICE)
         self.train_dataloader = train_dataloader
         self.val_dataloader = val_dataloader
         self.test_dataloader = test_dataloader
         self.criterion = criterion
         self.optimizer = optimizer
+        self.phi_matrices = phi_matrices
+        self.modes = modes
     
-    def train(self, epochs, measurements, modes, val_frequency, log_frequency, print_frequency):
+    def train(self, epochs, val_frequency, log_frequency, print_frequency):
         self.step = 1
         self.model.train()
         for epoch in range(1, epochs + 1):
@@ -237,7 +241,7 @@ class Trainer:
             for x, y in self.train_dataloader:
                 x = x.float().to(DEVICE)
                 y = y.to(DEVICE)
-                if measurements != None: compress.process_batch(x, measurements, modes)
+                if self.phi_matrices != None: compress.process_batch(x, self.phi_matrices, self.modes)
                 verb_output, noun_output = self.model(x)
                 verb_loss = self.criterion(verb_output, y[:, 0])
                 noun_loss = self.criterion(noun_output, y[:, 1])
@@ -259,10 +263,10 @@ class Trainer:
                     self.print_metrics(epoch, verb_loss, noun_loss, verb_accuracy, noun_accuracy)
                 self.step += 1
             if (epoch % val_frequency) == 0:
-                self.validate('val', measurements, modes, log_frequency)
+                self.validate('val', log_frequency)
                 self.model.train()
     
-    def validate(self, split, measurements, modes, log_frequency):
+    def validate(self, split, log_frequency):
         if split == 'val': split_dataloader = self.val_dataloader
         elif split == 'test': split_dataloader = self.test_dataloader
         self.model.eval()
@@ -274,7 +278,7 @@ class Trainer:
             for x, y in split_dataloader:
                 x = x.float().to(DEVICE)
                 y = y.to(DEVICE)
-                if measurements != None: compress.process_batch(x, measurements, modes)
+                if self.phi_matrices != None: compress.process_batch(x, self.phi_matrices, self.modes)
                 verb_output, noun_output = self.model(x)
                 verb_loss = self.criterion(verb_output, y[:, 0])
                 noun_loss = self.criterion(noun_output, y[:, 1])
@@ -346,10 +350,14 @@ def main(args):
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=args.lr)
 
-    trainer = Trainer(model, train_dataloader, val_dataloader, test_dataloader, criterion, optimizer)
+    clip_dims = train_dataloader.dataset.__getitem__(0)[0].size()
+    phi_matrices = None if args.measurements == None else list(map(lambda x, y: 
+                        compress.random_bernoulli_matrix((x, clip_dims[y])).to(DEVICE), args.measurements, args.modes))
 
-    trainer.train(args.epochs, args.measurements, args.modes, args.val_frequency, args.log_frequency, args.print_frequency)
-    trainer.validate('test', args.measurements, args.modes, args.log_frequency)
+    trainer = Trainer(model, train_dataloader, val_dataloader, test_dataloader, criterion, optimizer, phi_matrices, args.modes)
+
+    trainer.train(args.epochs, args.val_frequency, args.log_frequency, args.print_frequency)
+    trainer.validate('test', args.log_frequency)
 
 if __name__ == "__main__":
     main(parser.parse_args())
