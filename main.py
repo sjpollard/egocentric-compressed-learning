@@ -150,6 +150,12 @@ parser.add_argument(
     help="Random seed used to generate train/val/test splits"
 )
 parser.add_argument(
+    "--matrix-type",
+    default="bernoulli",
+    choices=["bernoulli", "gaussian"],
+    help="The type of measurement matrices to use when compressing",
+)
+parser.add_argument(
     "--measurements", 
     nargs='*',
     default=None, 
@@ -234,9 +240,9 @@ class Trainer:
         self.modes = modes
     
     def train(self, epochs, val_frequency, log_frequency, print_frequency):
-        self.step = 1
         self.model.train()
         for epoch in range(1, epochs + 1):
+            self.step = 1
             self.model.train()
             for x, y in self.train_dataloader:
                 x = x.float().to(DEVICE)
@@ -351,8 +357,12 @@ def main(args):
     optimizer = optim.SGD(model.parameters(), lr=args.lr)
 
     clip_dims = train_dataloader.dataset.__getitem__(0)[0].size()
+    if args.matrix_type == 'bernoulli':
+        matrix_gen = compress.random_bernoulli_matrix
+    elif args.matrix_type == 'gaussian':
+        matrix_gen = compress.random_gaussian_matrix
     phi_matrices = None if args.measurements == None else list(map(lambda x, y: 
-                        compress.random_bernoulli_matrix((x, clip_dims[y])).to(DEVICE), args.measurements, args.modes))
+                        matrix_gen((x, clip_dims[y])).to(DEVICE), args.measurements, args.modes))
 
     trainer = Trainer(model, train_dataloader, val_dataloader, test_dataloader, criterion, optimizer, phi_matrices, args.modes)
 
