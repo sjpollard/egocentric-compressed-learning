@@ -4,10 +4,10 @@ Improving the portability and tractability of egocentric action recognition on E
 
 ## Installation
 
-Clone egocentric-action-recognition
+Clone egocentric-compressed-learning
 
 ```
-https://github.com/sjpollard/egocentric-compressed-learning.git
+git clone https://github.com/sjpollard/egocentric-compressed-learning.git
 ```
 
 Prepare anaconda environment, `mamba` also works
@@ -16,24 +16,26 @@ Prepare anaconda environment, `mamba` also works
 conda env create -n ecl -f environment.yml
 ```
 
-Download and extract frames from EPIC-KITCHENS
+## Dataset
+
+Download and extract frames from [EPIC-KITCHENS](https://github.com/epic-kitchens/epic-kitchens-download-scripts)
 
 ```
 python epic_downloader.py --rgb-frames --epic55-only
 ```
 
-## Run
-
 If you want to preprocess EPIC-KITCHENS frames into chunked pytorch files
 
 ```
-python data.py --label test --dataset-path path/to/EPIC-KITCHENS --num-annotations n --chunks c
+python data.py --label example --dataset-path path/to/EPIC-KITCHENS --num-annotations n --chunks c
 ```
+
+## Run
 
 Then train the neural network with defaults
 
 ```
-python main.py tsn --load preprocessed --label test --chunks c
+python main.py tsn --label example --chunks c
 ```
 
 If you want to postprocess EPIC-KITCHENS frames from the dataset
@@ -45,7 +47,7 @@ python main.py tsn --load postprocessed --dataset-path path/to/EPIC-KITCHENS --n
 To utilise compressed learning, input measurement matrix heights and corresponding modes
 
 ```
-python main.py tsn --load preprocessed --label test --chunks c --matrix-type t --measurements m1 m2 m3 m4 --modes 0 1 2 3
+python main.py tsn --label example --chunks c --matrix-type t --measurements m1 m2 m3 m4 --modes 0 1 2 3
 ```
 
 ## Arguments
