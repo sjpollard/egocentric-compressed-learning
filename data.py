@@ -19,49 +19,47 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
 parser.add_argument(
-    "--label",
-    default="EPIC",
-    type=str,
-    help="Label prepended to the pytorch data files"
-)
-parser.add_argument(
-    "--num-annotations",
-    default=1000,
-    type=int,
-    help="Number of annotations to take from the csv file"
-)
-parser.add_argument(
-    "--chunks",
-    default=1,
-    type=int,
-    help="Number of evenly sized chunks in the preprocessed data set"
-)
-parser.add_argument(
-    "--ratio",
-    nargs=3,
-    default=[80, 10, 10],
-    type=int,
-    help="Ratio of train/val/test splits respectively, input as space separated numbers that add to 100"
-)
-parser.add_argument(
-    "--segment-count",
-    default=8,
-    type=int,
-    help="Number of segments. For RGB this corresponds to number of "
-    "frames, whereas for Flow, it is the number of points from "
-    "which a stack of (u, v) frames are sampled."
-)
-parser.add_argument(
     "--dataset-path",
     default="",
     type=str,
     help="Path to the EPIC-KITCHENS folder on the device"
 )
 parser.add_argument(
+    "--label",
+    default="EPIC",
+    type=str,
+    help="Label to prepend to preprocessed dataset files"
+)
+parser.add_argument(
+    "--num-annotations",
+    default=1000,
+    type=int,
+    help="Number of annotations to preprocess from EPIC-KITCHENS"
+)
+parser.add_argument(
+    "--chunks",
+    default=1,
+    type=int,
+    help="Number of evenly sized chunks to preprocess into"
+)
+parser.add_argument(
+    "--ratio",
+    nargs=3,
+    default=[80, 10, 10],
+    type=int,
+    help="Ratio of train/val/test splits respectively in preprocessed dataset"
+)
+parser.add_argument(
     "--seed",
     default=0,
     type=int,
     help="Random seed used to generate train/val/test splits"
+)
+parser.add_argument(
+    "--segment-count",
+    default=8,
+    type=int,
+    help="Number of temporal segments to sample from"
 )
 
 class PreprocessedEPICDataset(Dataset):

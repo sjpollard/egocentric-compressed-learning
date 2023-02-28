@@ -110,7 +110,7 @@ parser.add_argument(
     "--load",
     default="preprocessed",
     choices=["preprocessed", "postprocessed"],
-    help="Whether the model loads from a preprocessed pytorch file created with data.py or postprocesses the input directly from EPIC-KITCHENS",
+    help="Use 'preprocessed' or 'postprocessed' dataset",
 )
 parser.add_argument(
     "--dataset-path",
@@ -122,26 +122,46 @@ parser.add_argument(
     "--label",
     default="EPIC",
     type=str,
-    help="Label prepended to preprocessed pytorch data files"
+    help="Label prepended to preprocessed dataset files"
+)
+parser.add_argument(
+    "--matrix-type",
+    default=None,
+    choices=[None, "bernoulli", "gaussian"],
+    help="'bernoulli' or 'gaussian' matrices",
+)
+parser.add_argument(
+    "--measurements", 
+    nargs='*',
+    default=None, 
+    type=int, 
+    help="Heights of measurement matrices"
+)
+parser.add_argument(
+    "--modes", 
+    nargs='*',
+    default=None, 
+    type=int, 
+    help="Modes corresponding to measurement matrices"
 )
 parser.add_argument(
     "--num-annotations",
     default=1000,
     type=int,
-    help="Number of annotations to take from the csv file"
+    help="Number of annotations to postprocess from EPIC-KITCHENS"
 )
 parser.add_argument(
     "--chunks",
     default=1,
     type=int,
-    help="Number of evenly sized chunks in the preprocessed data set"
+    help="Number of evenly sized chunks in preprocessed dataset"
 )
 parser.add_argument(
     "--ratio",
     nargs=3,
     default=[80, 10, 10],
     type=int,
-    help="Ratio of train/val/test splits respectively, input as space separated numbers that add to 100"
+    help="Ratio of train/val/test splits respectively in postprocessed dataset"
 )
 parser.add_argument(
     "--seed",
@@ -150,32 +170,46 @@ parser.add_argument(
     help="Random seed used to generate train/val/test splits"
 )
 parser.add_argument(
-    "--matrix-type",
-    default="bernoulli",
-    choices=["bernoulli", "gaussian"],
-    help="The type of measurement matrices to use when compressing",
+    "--epochs",
+    default=10,
+    type=int,
+    help="Number of epochs to train"
 )
 parser.add_argument(
-    "--measurements", 
-    nargs='*',
-    default=None, 
-    type=int, 
-    help="Height of the measurement matrix for each mode of the input clip we're compressing"
+    "--batch-size",
+    default=10,
+    type=int,
+    help="Number of clips per batch"
 )
 parser.add_argument(
-    "--modes", 
-    nargs='*',
-    default=None, 
-    type=int, 
-    help="Corresponding modes of the input clip to compress with the measurement matrices"
+    "--lr", 
+    default=1e-3, 
+    type=float, 
+    help="Learning rate of the network"
 )
-parser.add_argument("--batch-size", default=10, type=int, help="Batch size")
-parser.add_argument("--epochs", default=10, type=int, help="Number of epochs to train")
-parser.add_argument("--lr", default=1e-3, type=float, help="Learning rate")
-parser.add_argument("--val-frequency", default=2, type=int, help="How frequently to test the model on the validation set in number of epochs")
-parser.add_argument("--log-frequency", default=0, type=int, help="How frequently to save logs to wandb in number of steps",)
-parser.add_argument("--print-frequency", default=10, type=int, help="How frequently to print progress to the command line in number of steps")
-parser.add_argument("--print-model", action="store_true", help="Print model definition")
+parser.add_argument(
+    "--val-frequency", 
+    default=2, 
+    type=int, 
+    help="Epochs until validation set is tested"
+)
+parser.add_argument(
+    "--log-frequency", 
+    default=0, 
+    type=int, 
+    help="Steps until logs are saved with `wandb`"
+)
+parser.add_argument(
+    "--print-frequency", 
+    default=10, 
+    type=int, 
+    help="Steps until training batch results are printed"
+)
+parser.add_argument(
+    "--print-model", 
+    action="store_true", 
+    help="Print model definition"
+)
 
 
 def extract_settings_from_args(args: argparse.Namespace) -> Dict[str, Any]:
@@ -361,7 +395,7 @@ def main(args):
         matrix_gen = compress.random_bernoulli_matrix
     elif args.matrix_type == 'gaussian':
         matrix_gen = compress.random_gaussian_matrix
-    phi_matrices = None if args.measurements == None else list(map(lambda x, y: 
+    phi_matrices = None if args.matrix_type == None else list(map(lambda x, y: 
                         matrix_gen((x, clip_dims[y])).to(DEVICE), args.measurements, args.modes))
 
     trainer = Trainer(model, train_dataloader, val_dataloader, test_dataloader, criterion, optimizer, phi_matrices, args.modes)

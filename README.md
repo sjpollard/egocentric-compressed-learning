@@ -45,7 +45,7 @@ python main.py tsn --load postprocessed --dataset-path path/to/EPIC-KITCHENS --n
 To utilise compressed learning, input measurement matrix heights and corresponding modes
 
 ```
-python main.py tsn --load preprocessed --label test --chunks c --measurements m1 m2 m3 m4 --modes 0 1 2 3
+python main.py tsn --load preprocessed --label test --chunks c --matrix-type t --measurements m1 m2 m3 m4 --modes 0 1 2 3
 ```
 
 ## Arguments
@@ -53,32 +53,33 @@ python main.py tsn --load preprocessed --label test --chunks c --measurements m1
 ### main.py
 
 - `model_type` (str): Only supports `'tsn'`
-- `--load` (str): `'preprocessed'` or `'postprocessed'`
+- `--segment_count` (int): Number of temporal segments to sample from
+- `--load` (str): Use `'preprocessed'` or `'postprocessed'` dataset
 - `--dataset-path` (str): Path to the EPIC-KITCHENS folder on the device
-- `--label` (str): Label prepended to preprocessed pytorch files
+- `--label` (str): Label prepended to preprocessed dataset files
+- `--matrix-type` (str): `'bernoulli'` or `'gaussian'` matrices
 - `--measurements` (int tuple): Heights of measurement matrices
 - `--modes` (int tuple): Modes corresponding to measurement matrices
-- `--num-annotations` (int): Number of annotations to take from the csv file
-- `--chunks` (int): Number of evenly sized chunks in the preprocessed data set
-- `--ratio` (int tuple): Ratio of train/val/test splits respectively
+- `--num-annotations` (int): Number of annotations to postprocess from EPIC-KITCHENS
+- `--chunks` (int): Number of evenly sized chunks in preprocessed dataset
+- `--ratio` (int tuple): Ratio of train/val/test splits respectively in postprocessed dataset
 - `--seed` (int): Random seed used to generate train/val/test splits
 - `--epoch` (int): Number of training epochs
-- `--segment_count` (int): Number of temporal segments to sample from
-- `--batch_size` (int): Number of clips to train with at once
-- `--lr` (float): Rate that the network learns at
+- `--batch_size` (int): Number of clips per batch
+- `--lr` (float): Learning rate of the network
 - `--val_frequency` (int): Epochs until validation set is tested
 - `--log_frequency` (int): Steps until logs are saved with `wandb`
 - `--print_frequency` (int): Steps until training batch results are printed
 
 ### data.py
 
-- `--dataset-path` (str): Path to the EPIC-KITCHENS folder on the device
-- `--label` (str): Label prepended to preprocessed pytorch files
-- `--num-annotations` (int): Number of annotations to take from the csv file
-- `--chunks` (int): Number of evenly sized chunks in the preprocessed data set
-- `--ratio` (int tuple): Ratio of train/val/test splits respectively
-- `--seed` (int): Random seed used to generate train/val/test splits
 - `--segment_count` (int): Number of temporal segments to sample from
+- `--dataset-path` (str): Path to the EPIC-KITCHENS folder on the device
+- `--label` (str): Label to prepend to preprocessed dataset files
+- `--num-annotations` (int): Number of annotations to preprocess from EPIC-KITCHENS
+- `--chunks` (int): Number of evenly sized chunks to preprocess into
+- `--ratio` (int tuple): Ratio of train/val/test splits respectively in preprocessed dataset
+- `--seed` (int): Random seed used to generate train/val/test splits
 
 ## Acknowledgements
 This project borrows ideas and/or code from the following preceding works:
