@@ -12,6 +12,7 @@ dependencies:
   - tensorly
   - wandb
   - scikit-learn
+  - matplotlib
   - pytorch
   - torchvision
   - pytorch-cuda=11.6

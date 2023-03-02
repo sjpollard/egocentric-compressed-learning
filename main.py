@@ -357,6 +357,10 @@ class Trainer:
         )
 
 def main(args):
+    dataprocessor = data.DataProcessor(args.dataset_path, 'annotations', 'data')
+
+    train_dataloader, val_dataloader, test_dataloader = get_dataloaders(dataprocessor, args)
+    
     logging.basicConfig(level=logging.INFO)
     if args.checkpoint is None:
         if args.model_type is None:
@@ -372,20 +376,9 @@ def main(args):
 
     if args.print_model:
         print(model)
-    height, width = model.input_size, model.input_size
-    if model.modality == "RGB":
-        channel_dim = 3
-    elif model.modality == "Flow":
-        channel_dim = args.flow_length * 2
-    else:
-        raise ValueError(f"Unknown modality {args.modality}")
     
     if args.log_frequency != 0:
         wandb.init(project="egocentric-compressed-learning", config=settings)
-    
-    dataprocessor = data.DataProcessor(args.dataset_path, 'annotations', 'data')
-
-    train_dataloader, val_dataloader, test_dataloader = get_dataloaders(dataprocessor, args)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=args.lr)

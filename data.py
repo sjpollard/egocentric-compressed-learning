@@ -11,6 +11,7 @@ from torchvision import transforms
 from PIL import Image
 from torch.utils.data import Dataset
 from sklearn.model_selection import train_test_split
+from matplotlib import pyplot as plt
 
 tl.set_backend('pytorch')
 
@@ -60,6 +61,12 @@ parser.add_argument(
     default=8,
     type=int,
     help="Number of temporal segments to sample from"
+)
+parser.add_argument(
+    "--print-stats",
+    default=False,
+    action="store_true",
+    help="Print dataset statistics"
 )
 
 class PreprocessedEPICDataset(Dataset):
@@ -162,6 +169,12 @@ class DataProcessor:
 
     def load_from_pt(self, label, filename):
         return torch.load(f'{self.data_path}/{label}/{filename}')
+    
+    def load_annotations(self, label):
+        train = pd.read_csv(f'{self.data_path}/{label}/{label}_train.csv')
+        val = pd.read_csv(f'{self.data_path}/{label}/{label}_val.csv')
+        test = pd.read_csv(f'{self.data_path}/{label}/{label}_test.csv')
+        return train, val, test
 
 def preprocess_epic(label, num_annotations, chunks, ratio, dataprocessor, segment_count, seed):
     train, val, test = dataprocessor.split_annotations(num_annotations, ratio, seed)
@@ -180,10 +193,28 @@ def preprocess_epic(label, num_annotations, chunks, ratio, dataprocessor, segmen
         chunk_X, chunk_Y = dataprocessor.get_split(test_chunks[i].reset_index(), segment_count)
         dataprocessor.save_to_pt(label, f'{label}_{i + 1}_test_X.pt', chunk_X)
         dataprocessor.save_to_pt(label, f'{label}_{i + 1}_test_Y.pt', chunk_Y)
+    train.reset_index(drop=True).to_csv(f'{dataprocessor.data_path}/{label}/{label}_train.csv', index=False)
+    val.reset_index(drop=True).to_csv(f'{dataprocessor.data_path}/{label}/{label}_val.csv', index=False)
+    test.reset_index(drop=True).to_csv(f'{dataprocessor.data_path}/{label}/{label}_test.csv', index=False)
 
 def main(args):
     dataprocessor = DataProcessor(args.dataset_path, 'annotations', 'data')
-    preprocess_epic(args.label, args.num_annotations, args.chunks, tuple(args.ratio), dataprocessor, args.segment_count, args.seed)
+
+    if args.print_stats:
+        train, val, test = dataprocessor.load_annotations(args.label)
+        train_counts = train['verb_class'].value_counts(normalize=True), train['noun_class'].value_counts(normalize=True)
+        train_classes = train_counts[0].index.to_numpy(), train_counts[1].index.to_numpy()
+        train_probs = train_counts[0].to_numpy(), train_counts[1].to_numpy()
+        val_counts = val['verb_class'].value_counts(normalize=True), val['noun_class'].value_counts(normalize=True)
+        val_classes = val_counts[0].index.to_numpy(), val_counts[1].index.to_numpy()
+        val_probs = val_counts[0].to_numpy(), val_counts[1].to_numpy()
+        test_counts = test['verb_class'].value_counts(normalize=True), test['noun_class'].value_counts(normalize=True)
+        test_classes = test_counts[0].index.to_numpy(), test_counts[1].index.to_numpy()
+        test_probs = test_counts[0].to_numpy(), test_counts[1].to_numpy()
+        print(train_probs[0], val_probs[0], test_probs[0])
+        
+    else:
+        preprocess_epic(args.label, args.num_annotations, args.chunks, tuple(args.ratio), dataprocessor, args.segment_count, args.seed)
    
 
 if __name__ == "__main__":
