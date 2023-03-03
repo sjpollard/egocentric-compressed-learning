@@ -30,6 +30,12 @@ If you want to preprocess EPIC-KITCHENS frames into chunked pytorch files
 python data.py --label example --dataset-path path/to/EPIC-KITCHENS --num-annotations n --chunks c
 ```
 
+To print the random performance on these dataset splits
+
+```
+python data.py --label example --random-perf
+```
+
 ## Run
 
 Then train the neural network with defaults
@@ -82,6 +88,7 @@ python main.py tsn --label example --chunks c --matrix-type t --measurements m1 
 - `--chunks` (int): Number of evenly sized chunks to preprocess into
 - `--ratio` (int tuple): Ratio of train/val/test splits respectively in preprocessed dataset
 - `--seed` (int): Random seed used to generate train/val/test splits
+- `--random-perf` (on/off): Print random performance of dataset splits
 
 ## Acknowledgements
 This project borrows ideas and/or code from the following preceding works:

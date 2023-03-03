@@ -33,3 +33,7 @@ def class_accuracy(prediction, label):
     mean_cls_acc = cls_acc.mean()
 
     return cls_acc, mean_cls_acc
+
+def compute_accuracy(y, y_hat):
+    assert len(y) == len(y_hat)
+    return float((y == y_hat).sum()) / len(y)

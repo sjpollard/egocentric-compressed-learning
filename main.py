@@ -19,7 +19,7 @@ from torch.utils.data import DataLoader
 from torch import nn, optim
 from torch.optim.optimizer import Optimizer
 from torchvision import transforms
-from timeit import default_timer as timer
+from ops.utils import compute_accuracy
 
 tl.set_backend('pytorch')
 
@@ -224,11 +224,6 @@ def extract_settings_from_args(args: argparse.Namespace) -> Dict[str, Any]:
             settings[stripped_key] = settings[key]
             del settings[key]
     return settings
-
-
-def compute_accuracy(y, y_hat):
-    assert len(y) == len(y_hat)
-    return float((y == y_hat).sum()) / len(y)
 
 
 def get_dataloaders(dataprocessor, args):
