@@ -401,15 +401,14 @@ def main(args):
 
     if args.save_model != None:
         if args.matrix_type == None:
-            measurements_str = ''
-            modes_str = ''
+            filename = f'{args.label}_{args.epochs}.pt'
         else:
-            measurements_str = f'_{"_".join(map(str, args.measurements))}'
-            modes_str = f'{"_".join(map(str, args.modes))}_'
-        filename = f'{args.label}_{args.matrix_type}{measurements_str}_{modes_str}{args.epochs}.pt'
+            filename = f'{args.label}_{args.matrix_type}_{"_".join(map(str, args.measurements))}_{"_".join(map(str, args.modes))}_{args.epochs}.pt'
+            phi_matrices_filename = f'phi_matrices_{args.label}_{args.matrix_type}_{"_".join(map(str, args.measurements))}_{"_".join(map(str, args.modes))}_{args.epochs}.pt'
         if not os.path.exists('checkpoints'):
             os.makedirs('checkpoints')
         torch.save(trainer.model.state_dict(), f'checkpoints/{filename}')
+        if args.matrix_type != None: torch.save(phi_matrices, f'checkpoints/{phi_matrices_filename}')
 
 if __name__ == "__main__":
     main(parser.parse_args())
