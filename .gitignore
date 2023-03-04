@@ -1,6 +1,4 @@
-*.code-workspace
 __pycache__
-ecl
-EPIC-KITCHENS
 data
+checkpoints
 wandb

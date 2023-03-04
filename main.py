@@ -5,6 +5,7 @@ import sys
 
 from pathlib import Path
 from typing import Any, Dict
+from numpy import matrix
 
 import torch
 import tensorly as tl
@@ -12,6 +13,7 @@ import data
 import wandb
 import pandas as pd
 import compress
+import os
 
 from model_loader import load_checkpoint, make_model
 from data import PreprocessedEPICDataset, PostprocessedEPICDataset
@@ -210,6 +212,12 @@ parser.add_argument(
     action="store_true", 
     help="Print model definition"
 )
+parser.add_argument(
+    "--save-model",
+    default=False,
+    action="store_true",
+    help="Saves model as checkpoint for evaluation"
+)
 
 
 def extract_settings_from_args(args: argparse.Namespace) -> Dict[str, Any]:
@@ -390,6 +398,18 @@ def main(args):
 
     trainer.train(args.epochs, args.val_frequency, args.log_frequency, args.print_frequency)
     trainer.validate('test', args.log_frequency)
+
+    if args.save_model != None:
+        if args.matrix_type == None:
+            measurements_str = ''
+            modes_str = ''
+        else:
+            measurements_str = f'_{"_".join(map(str, args.measurements))}'
+            modes_str = f'{"_".join(map(str, args.modes))}_'
+        filename = f'{args.label}_{args.matrix_type}{measurements_str}_{modes_str}{args.epochs}.pt'
+        if not os.path.exists('checkpoints'):
+            os.makedirs('checkpoints')
+        torch.save(trainer.model.state_dict(), f'checkpoints/{filename}')
 
 if __name__ == "__main__":
     main(parser.parse_args())

@@ -1,4 +1,4 @@
-# egocentric-compressed-learning
+# Compressed Learning for Egocentric Action Recognition
 
 Improving the portability and tractability of egocentric action recognition on EPIC-KITCHENS by learning with compressed measurements.
 
@@ -56,6 +56,12 @@ To utilise compressed learning, input measurement matrix heights and correspondi
 python main.py tsn --label example --chunks c --matrix-type t --measurements m1 m2 m3 m4 --modes 0 1 2 3
 ```
 
+To save model as a checkpoint after training
+
+```
+python main.py tsn --label example --chunks c ... --save-model
+```
+
 ## Arguments
 
 ### main.py
@@ -78,6 +84,7 @@ python main.py tsn --label example --chunks c --matrix-type t --measurements m1 
 - `--val_frequency` (int): Epochs until validation set is tested
 - `--log_frequency` (int): Steps until logs are saved with `wandb`
 - `--print_frequency` (int): Steps until training batch results are printed
+- `--save-model` (on/off): Saves model as checkpoint for evaluation
 
 ### data.py
 
