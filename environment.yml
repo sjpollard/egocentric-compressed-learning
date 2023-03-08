@@ -17,6 +17,7 @@ dependencies:
   - torchvision
   - pytorch-cuda=11.6
   - pip:
+    - torchshow
     # The released version of pretrainedmodels has a bug around DataParallel and
     # pytorch 1.0, see the following links for details:
     # - https://github.com/Cadene/pretrained-models.pytorch/pull/145

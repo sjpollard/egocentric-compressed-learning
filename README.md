@@ -62,6 +62,30 @@ To save model as a checkpoint after training
 python main.py tsn --label example --chunks c ... --save-model
 ```
 
+To visualise annotation and compressed sensing with checkpointed matrix
+
+```
+python visualise.py --label example --chunks c --matrix-type t --measurements m1 m2 m3 m4 --modes 0 1 2 3
+```
+
+## How does it work?
+
+Take an example clip from EPIC-KITCHENS
+
+![](./images/example_clip.png)
+
+Here we have measurement matrices for spatial compression
+
+![](./images/example_phi_matrices.png)
+
+Apply these matrices to compress the clip
+
+![](./images/example_compressed_clip.png)
+
+Reshape the compressed clip with matrix transpose for neural network input
+
+![](./images/example_inferred_clip.png)
+
 ## Arguments
 
 ### main.py
@@ -78,7 +102,7 @@ python main.py tsn --label example --chunks c ... --save-model
 - `--chunks` (int): Number of evenly sized chunks in preprocessed dataset
 - `--ratio` (int tuple): Ratio of train/val/test splits respectively in postprocessed dataset
 - `--seed` (int): Random seed used to generate train/val/test splits
-- `--epoch` (int): Number of training epochs
+- `--epochs` (int): Number of training epochs
 - `--batch_size` (int): Number of clips per batch
 - `--lr` (float): Learning rate of the network
 - `--val_frequency` (int): Epochs until validation set is tested
@@ -96,6 +120,17 @@ python main.py tsn --label example --chunks c ... --save-model
 - `--ratio` (int tuple): Ratio of train/val/test splits respectively in preprocessed dataset
 - `--seed` (int): Random seed used to generate train/val/test splits
 - `--random-perf` (on/off): Print random performance of dataset splits
+
+### visualise.py
+
+- `--label` (str): Label prepended to preprocessed dataset files
+- `--matrix-type` (str): `'bernoulli'` or `'gaussian'` matrices
+- `--measurements` (int tuple): Heights of measurement matrices
+- `--modes` (int tuple): Modes corresponding to measurement matrices
+- `--chunks` (int): Number of evenly sized chunks in preprocessed dataset
+- `--epochs` (int): Number of training epochs
+- `--split` (str): `'train'`, `'val'` or `'test'` dataset split to visualise from
+- `--index` (str): Index of clip to visualise
 
 ## Acknowledgements
 This project borrows ideas and/or code from the following preceding works:
