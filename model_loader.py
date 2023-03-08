@@ -19,6 +19,7 @@ def make_tsn(settings):
         new_length=settings["flow_length"] if settings["modality"] == "Flow" else 1,
         consensus_type=settings["consensus_type"],
         dropout=settings["dropout"],
+        phi_matrices=settings['phi_matrices']
     )
 
 

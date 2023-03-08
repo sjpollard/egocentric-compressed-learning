@@ -11,7 +11,6 @@ from PIL import Image
 from torch.utils.data import Dataset
 from sklearn.model_selection import train_test_split
 from ops.utils import compute_accuracy
-from matplotlib import pyplot as plt
 
 tl.set_backend('pytorch')
 

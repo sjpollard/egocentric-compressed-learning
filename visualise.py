@@ -1,5 +1,4 @@
 import argparse
-from bz2 import compress
 
 import torch
 import torchshow as ts

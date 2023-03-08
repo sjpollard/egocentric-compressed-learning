@@ -5,13 +5,11 @@ import sys
 
 from pathlib import Path
 from typing import Any, Dict
-from numpy import matrix
 
 import torch
 import tensorly as tl
 import data
 import wandb
-import pandas as pd
 import compress
 import os
 
@@ -147,6 +145,12 @@ parser.add_argument(
     help="Modes corresponding to measurement matrices"
 )
 parser.add_argument(
+    "--learn-matrix", 
+    default=False,
+    action="store_true", 
+    help="Adds the measurement matrices as a learnable parameter"
+)
+parser.add_argument(
     "--num-annotations",
     default=1000,
     type=int,
@@ -257,6 +261,43 @@ def get_dataloaders(dataprocessor, args):
     
     return train_dataloader, val_dataloader, test_dataloader
 
+def get_matrices(clip_dims, args):
+    if args.matrix_type == 'bernoulli':
+        matrix_gen = compress.random_bernoulli_matrix
+    elif args.matrix_type == 'gaussian':
+        matrix_gen = compress.random_gaussian_matrix
+    phi_matrices = None if args.matrix_type == None else list(map(lambda x, y: 
+                        matrix_gen((x, clip_dims[y])).to(DEVICE), args.measurements, args.modes))
+    return phi_matrices
+
+def get_model(args, phi_matrices):
+    if args.checkpoint is None:
+        if args.model_type is None:
+            print("If not providing a checkpoint, you must specify model_type")
+            sys.exit(1)
+        settings = extract_settings_from_args(args)
+        if args.learn_matrix: settings.update({'phi_matrices': phi_matrices})
+        else: settings.update({'phi_matrices': None})
+        model = make_model(settings)
+        if args.learn_matrix: phi_matrices = model.phi_matrices
+    elif args.checkpoint is not None and args.checkpoint.exists():
+        model = load_checkpoint(args.checkpoint)
+    else:
+        print(f"{args.checkpoint} doesn't exist")
+        sys.exit(1)
+    return settings, model
+
+def save_model(trainer, args, phi_matrices):
+    if args.matrix_type == None:
+            filename = f'{args.label}_{args.epochs}.pt'
+    else:
+        filename = f'{args.label}_{args.matrix_type}_{"_".join(map(str, args.measurements))}_{"_".join(map(str, args.modes))}_{args.epochs}.pt'
+        phi_matrices_filename = f'phi_matrices_{args.label}_{args.matrix_type}_{"_".join(map(str, args.measurements))}_{"_".join(map(str, args.modes))}_{args.epochs}.pt'
+    if not os.path.exists('checkpoints'):
+        os.makedirs('checkpoints')
+    torch.save(trainer.model.state_dict(), f'checkpoints/{filename}')
+    if args.matrix_type != None: torch.save(phi_matrices, f'checkpoints/{phi_matrices_filename}')
+
 class Trainer:
     def __init__(self, 
                  model: nn.Module, 
@@ -364,35 +405,19 @@ def main(args):
 
     train_dataloader, val_dataloader, test_dataloader = get_dataloaders(dataprocessor, args)
     
+    phi_matrices = get_matrices(train_dataloader.dataset.__getitem__(0)[0].size(), args)
+
     logging.basicConfig(level=logging.INFO)
-    if args.checkpoint is None:
-        if args.model_type is None:
-            print("If not providing a checkpoint, you must specify model_type")
-            sys.exit(1)
-        settings = extract_settings_from_args(args)
-        model = make_model(settings)
-    elif args.checkpoint is not None and args.checkpoint.exists():
-        model = load_checkpoint(args.checkpoint)
-    else:
-        print(f"{args.checkpoint} doesn't exist")
-        sys.exit(1)
+    settings, model = get_model(args, phi_matrices)
 
     if args.print_model:
         print(model)
-    
+
     if args.log_frequency != 0:
         wandb.init(project="egocentric-compressed-learning", config=settings)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=args.lr)
-
-    clip_dims = train_dataloader.dataset.__getitem__(0)[0].size()
-    if args.matrix_type == 'bernoulli':
-        matrix_gen = compress.random_bernoulli_matrix
-    elif args.matrix_type == 'gaussian':
-        matrix_gen = compress.random_gaussian_matrix
-    phi_matrices = None if args.matrix_type == None else list(map(lambda x, y: 
-                        matrix_gen((x, clip_dims[y])).to(DEVICE), args.measurements, args.modes))
 
     trainer = Trainer(model, train_dataloader, val_dataloader, test_dataloader, criterion, optimizer, phi_matrices, args.modes)
 
@@ -400,15 +425,7 @@ def main(args):
     trainer.validate('test', args.log_frequency)
 
     if args.save_model != None:
-        if args.matrix_type == None:
-            filename = f'{args.label}_{args.epochs}.pt'
-        else:
-            filename = f'{args.label}_{args.matrix_type}_{"_".join(map(str, args.measurements))}_{"_".join(map(str, args.modes))}_{args.epochs}.pt'
-            phi_matrices_filename = f'phi_matrices_{args.label}_{args.matrix_type}_{"_".join(map(str, args.measurements))}_{"_".join(map(str, args.modes))}_{args.epochs}.pt'
-        if not os.path.exists('checkpoints'):
-            os.makedirs('checkpoints')
-        torch.save(trainer.model.state_dict(), f'checkpoints/{filename}')
-        if args.matrix_type != None: torch.save(phi_matrices, f'checkpoints/{phi_matrices_filename}')
+        save_model(trainer, args, phi_matrices)
 
 if __name__ == "__main__":
     main(parser.parse_args())

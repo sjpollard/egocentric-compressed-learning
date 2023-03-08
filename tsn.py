@@ -97,6 +97,7 @@ class TSN(nn.Module):
         img_feature_dim=256,
         partial_bn=True,
         pretrained="imagenet",
+        phi_matrices=None
     ):
 
         super(TSN, self).__init__()
@@ -170,6 +171,9 @@ TSN Configurations:
             self.partialBN(True)
         if pretrained and pretrained != "imagenet":
             self._load_pretrained_model(pretrained)
+
+        if phi_matrices != None:
+            self.phi_matrices = nn.ParameterList(phi_matrices)
 
     def _load_pretrained_model(self, pretrained):
         config = self._get_pretrained_model_config()

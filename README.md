@@ -56,6 +56,12 @@ To utilise compressed learning, input measurement matrix heights and correspondi
 python main.py tsn --label example --chunks c --matrix-type t --measurements m1 m2 m3 m4 --modes 0 1 2 3
 ```
 
+To learn the measurement matrices as weights of the neural network
+
+```
+python main.py tsn --label example --chunks c ... --learn-matrix
+```
+
 To save model as a checkpoint after training
 
 ```
@@ -98,6 +104,7 @@ Reshape the compressed clip with matrix transpose for neural network input
 - `--matrix-type` (str): `'bernoulli'` or `'gaussian'` matrices
 - `--measurements` (int tuple): Heights of measurement matrices
 - `--modes` (int tuple): Modes corresponding to measurement matrices
+- `--learn-matrix` (on/off): Adds the measurement matrices as a learnable parameter
 - `--num-annotations` (int): Number of annotations to postprocess from EPIC-KITCHENS
 - `--chunks` (int): Number of evenly sized chunks in preprocessed dataset
 - `--ratio` (int tuple): Ratio of train/val/test splits respectively in postprocessed dataset
