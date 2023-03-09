@@ -65,13 +65,13 @@ python main.py tsn --label example --chunks c ... --learn-matrix
 To save model as a checkpoint after training
 
 ```
-python main.py tsn --label example --chunks c ... --save-model
+python main.py tsn --label example --chunks c ... --model-label example-model
 ```
 
 To visualise annotation and compressed sensing with checkpointed matrix
 
 ```
-python visualise.py --label example --chunks c --matrix-type t --measurements m1 m2 m3 m4 --modes 0 1 2 3
+python visualise.py --label example --model-label example-model --chunks c --modes 0 1 2 3
 ```
 
 ## How does it work?
@@ -115,7 +115,7 @@ Reshape the compressed clip with matrix transpose for neural network input
 - `--val_frequency` (int): Epochs until validation set is tested
 - `--log_frequency` (int): Steps until logs are saved with `wandb`
 - `--print_frequency` (int): Steps until training batch results are printed
-- `--save-model` (on/off): Saves model as checkpoint for evaluation
+- `--model-label` (str): Saves model with given label as checkpoint for evaluation
 
 ### data.py
 
@@ -131,11 +131,9 @@ Reshape the compressed clip with matrix transpose for neural network input
 ### visualise.py
 
 - `--label` (str): Label prepended to preprocessed dataset files
-- `--matrix-type` (str): `'bernoulli'` or `'gaussian'` matrices
-- `--measurements` (int tuple): Heights of measurement matrices
+- `--model-label` (str): Label of saved model checkpoint
 - `--modes` (int tuple): Modes corresponding to measurement matrices
 - `--chunks` (int): Number of evenly sized chunks in preprocessed dataset
-- `--epochs` (int): Number of training epochs
 - `--split` (str): `'train'`, `'val'` or `'test'` dataset split to visualise from
 - `--index` (str): Index of clip to visualise
 

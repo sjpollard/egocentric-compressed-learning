@@ -217,10 +217,10 @@ parser.add_argument(
     help="Print model definition"
 )
 parser.add_argument(
-    "--save-model",
-    default=False,
-    action="store_true",
-    help="Saves model as checkpoint for evaluation"
+    "--model-label",
+    default=None,
+    type=str,
+    help="Saves model with given label as checkpoint for evaluation"
 )
 
 
@@ -288,15 +288,11 @@ def get_model(args, phi_matrices):
     return settings, model
 
 def save_model(trainer, args, phi_matrices):
-    if args.matrix_type == None:
-            filename = f'{args.label}_{args.epochs}.pt'
-    else:
-        filename = f'{args.label}_{args.matrix_type}_{"_".join(map(str, args.measurements))}_{"_".join(map(str, args.modes))}_{args.epochs}.pt'
-        phi_matrices_filename = f'phi_matrices_{args.label}_{args.matrix_type}_{"_".join(map(str, args.measurements))}_{"_".join(map(str, args.modes))}_{args.epochs}.pt'
     if not os.path.exists('checkpoints'):
         os.makedirs('checkpoints')
-    torch.save(trainer.model.state_dict(), f'checkpoints/{filename}')
-    if args.matrix_type != None: torch.save(phi_matrices, f'checkpoints/{phi_matrices_filename}')
+    torch.save(trainer.model.state_dict(), f'checkpoints/{args.model_label}.pt')
+    if args.matrix_type != None:
+        torch.save(phi_matrices, f'checkpoints/phi_{args.model_label}.pt')
 
 class Trainer:
     def __init__(self, 
@@ -424,7 +420,7 @@ def main(args):
     trainer.train(args.epochs, args.val_frequency, args.log_frequency, args.print_frequency)
     trainer.validate('test', args.log_frequency)
 
-    if args.save_model != None:
+    if args.model_label != None:
         save_model(trainer, args, phi_matrices)
 
 if __name__ == "__main__":

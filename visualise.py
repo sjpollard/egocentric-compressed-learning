@@ -25,17 +25,10 @@ parser.add_argument(
     help="Label prepended to preprocessed dataset files"
 )
 parser.add_argument(
-    "--matrix-type",
+    "--model-label",
     default=None,
-    choices=[None, "bernoulli", "gaussian"],
-    help="'bernoulli' or 'gaussian' matrices",
-)
-parser.add_argument(
-    "--measurements", 
-    nargs='*',
-    default=None, 
-    type=int, 
-    help="Heights of measurement matrices"
+    type=str,
+    help="Label of saved model checkpoint"
 )
 parser.add_argument(
     "--modes", 
@@ -49,12 +42,6 @@ parser.add_argument(
     default=1,
     type=int,
     help="Number of evenly sized chunks in preprocessed dataset"
-)
-parser.add_argument(
-    "--epochs",
-    default=10,
-    type=int,
-    help="Number of epochs to train"
 )
 parser.add_argument(
     "--split",
@@ -78,9 +65,8 @@ def main(args):
     dataset = get_dataset(dataprocessor, args)
     clip = dataset.__getitem__(args.index)[0].float().to(DEVICE)
     ts.show(clip)
-    if args.matrix_type != None:
-        phi_matrices_filename = f'phi_matrices_{args.label}_{args.matrix_type}_{"_".join(map(str, args.measurements))}_{"_".join(map(str, args.modes))}_{args.epochs}.pt'
-        phi_matrices = torch.load(f'checkpoints/{phi_matrices_filename}')
+    if args.modes != None:
+        phi_matrices = torch.load(f'checkpoints/phi_{args.model_label}.pt')
         ts.show(phi_matrices)
         compressed_clip = tl.tenalg.multi_mode_dot(clip, phi_matrices, args.modes)
         ts.show(compressed_clip)
