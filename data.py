@@ -15,7 +15,7 @@ from ops.utils import compute_accuracy
 tl.set_backend('pytorch')
 
 parser = argparse.ArgumentParser(
-    description="Test the instantiation and forward pass of models",
+    description="Handles processing and chunking of dataset",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
 parser.add_argument(

@@ -31,7 +31,7 @@ else:
     DEVICE = torch.device('cpu')
 
 parser = argparse.ArgumentParser(
-    description="Test the instantiation and forward pass of models",
+    description="Hub for everything necessary to train the neural network",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
 parser.add_argument(
@@ -279,7 +279,6 @@ def get_model(args, phi_matrices):
         if args.learn_matrix: settings.update({'phi_matrices': phi_matrices})
         else: settings.update({'phi_matrices': None})
         model = make_model(settings)
-        if args.learn_matrix: phi_matrices = model.phi_matrices
     elif args.checkpoint is not None and args.checkpoint.exists():
         model = load_checkpoint(args.checkpoint)
     else:
@@ -344,6 +343,7 @@ class Trainer:
                 self.step += 1
             if (epoch % val_frequency) == 0:
                 self.validate('val', log_frequency)
+                self.validate('test', log_frequency)
                 self.model.train()
     
     def validate(self, split, log_frequency):
@@ -405,6 +405,8 @@ def main(args):
 
     logging.basicConfig(level=logging.INFO)
     settings, model = get_model(args, phi_matrices)
+    
+    if args.learn_matrix: phi_matrices = model.phi_matrices
 
     if args.print_model:
         print(model)
@@ -418,7 +420,6 @@ def main(args):
     trainer = Trainer(model, train_dataloader, val_dataloader, test_dataloader, criterion, optimizer, phi_matrices, args.modes)
 
     trainer.train(args.epochs, args.val_frequency, args.log_frequency, args.print_frequency)
-    trainer.validate('test', args.log_frequency)
 
     if args.model_label != None:
         save_model(trainer, args, phi_matrices)

@@ -15,7 +15,7 @@ else:
     DEVICE = torch.device('cpu')
 
 parser = argparse.ArgumentParser(
-    description="Test the instantiation and forward pass of models",
+    description="Tool for visualising dataset clips and compression",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
 parser.add_argument(
@@ -66,7 +66,7 @@ def main(args):
     clip = dataset.__getitem__(args.index)[0].float().to(DEVICE)
     ts.show(clip)
     if args.modes != None:
-        phi_matrices = torch.load(f'checkpoints/phi_{args.model_label}.pt')
+        phi_matrices = list(torch.load(f'checkpoints/phi_{args.model_label}.pt'))
         ts.show(phi_matrices)
         compressed_clip = tl.tenalg.multi_mode_dot(clip, phi_matrices, args.modes)
         ts.show(compressed_clip)
