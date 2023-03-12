@@ -67,7 +67,7 @@ def main(args):
     ts.show(clip)
     if args.modes != None:
         phi_matrices = list(torch.load(f'checkpoints/phi_{args.model_label}.pt'))
-        ts.show(phi_matrices)
+        ts.show(phi_matrices, mode='image')
         compressed_clip = tl.tenalg.multi_mode_dot(clip, phi_matrices, args.modes)
         ts.show(compressed_clip)
         inferred_clip = tl.tenalg.multi_mode_dot(compressed_clip, phi_matrices, args.modes, transpose=True)
