@@ -145,10 +145,16 @@ parser.add_argument(
     help="Modes corresponding to measurement matrices"
 )
 parser.add_argument(
-    "--learn-matrix", 
+    "--learn-phi", 
     default=False,
     action="store_true", 
     help="Adds the measurement matrices as a learnable parameter"
+)
+parser.add_argument(
+    "--learn-theta", 
+    default=False,
+    action="store_true", 
+    help="Adds the inference matrices as a learnable parameter"
 )
 parser.add_argument(
     "--num-annotations",
@@ -276,8 +282,18 @@ def get_model(args, phi_matrices):
             print("If not providing a checkpoint, you must specify model_type")
             sys.exit(1)
         settings = extract_settings_from_args(args)
-        if args.learn_matrix: settings.update({'phi_matrices': phi_matrices})
-        else: settings.update({'phi_matrices': None})
+        if args.learn_phi and args.learn_theta:
+            settings.update({'phi_matrices': phi_matrices})
+            settings.update({'theta_matrices': list(map(lambda x: x.clone(), phi_matrices))})
+        elif args.learn_phi and not args.learn_theta:
+            settings.update({'phi_matrices': phi_matrices})
+            settings.update({'theta_matrices': None})
+        elif not args.learn_phi and args.learn_theta:
+            settings.update({'phi_matrices': None})
+            settings.update({'theta_matrices': list(map(lambda x: x.clone(), phi_matrices))})
+        else: 
+            settings.update({'phi_matrices': None})
+            settings.update({'theta_matrices': None})
         model = make_model(settings)
     elif args.checkpoint is not None and args.checkpoint.exists():
         model = load_checkpoint(args.checkpoint)
@@ -302,6 +318,7 @@ class Trainer:
                  criterion: nn.Module, 
                  optimizer: Optimizer,
                  phi_matrices: list,
+                 theta_matrices: list,
                  modes: list):
         self.model = model.to(DEVICE)
         self.train_dataloader = train_dataloader
@@ -310,6 +327,7 @@ class Trainer:
         self.criterion = criterion
         self.optimizer = optimizer
         self.phi_matrices = phi_matrices
+        self.theta_matrices = theta_matrices
         self.modes = modes
     
     def train(self, epochs, val_frequency, log_frequency, print_frequency):
@@ -318,9 +336,9 @@ class Trainer:
             self.step = 1
             self.model.train()
             for x, y in self.train_dataloader:
-                x = x.float().to(DEVICE)
+                x = (x.float() / 255.0).to(DEVICE)
                 y = y.to(DEVICE)
-                if self.phi_matrices != None: compress.process_batch(x, self.phi_matrices, self.modes)
+                if self.phi_matrices != None: compress.process_batch(x, self.phi_matrices, self.theta_matrices, self.modes)
                 verb_output, noun_output = self.model(x)
                 verb_loss = self.criterion(verb_output, y[:, 0])
                 noun_loss = self.criterion(noun_output, y[:, 1])
@@ -356,9 +374,9 @@ class Trainer:
         y_hats = []
         with torch.no_grad():
             for x, y in split_dataloader:
-                x = x.float().to(DEVICE)
+                x = (x.float() / 255.0).to(DEVICE)
                 y = y.to(DEVICE)
-                if self.phi_matrices != None: compress.process_batch(x, self.phi_matrices, self.modes)
+                if self.phi_matrices != None: compress.process_batch(x, self.phi_matrices, self.theta_matrices, self.modes)
                 verb_output, noun_output = self.model(x)
                 verb_loss = self.criterion(verb_output, y[:, 0])
                 noun_loss = self.criterion(noun_output, y[:, 1])
@@ -406,7 +424,9 @@ def main(args):
     logging.basicConfig(level=logging.INFO)
     settings, model = get_model(args, phi_matrices)
     
-    if args.learn_matrix: phi_matrices = model.phi_matrices
+    if args.learn_phi: phi_matrices = model.phi_matrices
+    if args.learn_theta: theta_matrices = model.theta_matrices
+    if args.learn_phi and not args.learn_theta: theta_matrices = phi_matrices
 
     if args.print_model:
         print(model)
@@ -417,7 +437,7 @@ def main(args):
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=args.lr)
 
-    trainer = Trainer(model, train_dataloader, val_dataloader, test_dataloader, criterion, optimizer, phi_matrices, args.modes)
+    trainer = Trainer(model, train_dataloader, val_dataloader, test_dataloader, criterion, optimizer, phi_matrices, theta_matrices, args.modes)
 
     trainer.train(args.epochs, args.val_frequency, args.log_frequency, args.print_frequency)
 

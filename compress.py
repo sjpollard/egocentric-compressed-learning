@@ -20,7 +20,7 @@ def random_bernoulli_matrix(shape):
     return torch.from_numpy(M).float()
 
 
-def process_batch(batch, phi_matrices, modes):
+def process_batch(batch, phi_matrices, theta_matrices, modes):
     for i in range(batch.size(0)):
         compressed = tl.tenalg.multi_mode_dot(batch[i], phi_matrices, modes)
-        batch[i] = tl.tenalg.multi_mode_dot(compressed, phi_matrices, modes, transpose=True)
+        batch[i] = tl.tenalg.multi_mode_dot(compressed, theta_matrices, modes, transpose=True)
