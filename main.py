@@ -303,13 +303,13 @@ def get_model(args, phi_matrices):
     return settings, model
 
 def save_model(trainer, args, phi_matrices, theta_matrices):
-    if not os.path.exists('checkpoints'):
-        os.makedirs('checkpoints')
-    torch.save(trainer.model.state_dict(), f'checkpoints/{args.model_label}.pt')
+    if not os.path.exists(f'checkpoints/{args.model_label}'):
+        os.makedirs(f'checkpoints/{args.model_label}')
+    torch.save(trainer.model.state_dict(), f'checkpoints/{args.model_label}/{args.model_label}.pt')
     if phi_matrices != None:
-        torch.save(phi_matrices, f'checkpoints/phi_{args.model_label}.pt')
+        torch.save(phi_matrices, f'checkpoints/{args.model_label}/phi_{args.model_label}.pt')
     if theta_matrices != None:
-        torch.save(theta_matrices, f'checkpoints/theta_{args.model_label}.pt')
+        torch.save(theta_matrices, f'checkpoints/{args.model_label}/theta_{args.model_label}.pt')
 
 class Trainer:
     def __init__(self, 
