@@ -302,12 +302,14 @@ def get_model(args, phi_matrices):
         sys.exit(1)
     return settings, model
 
-def save_model(trainer, args, phi_matrices):
+def save_model(trainer, args, phi_matrices, theta_matrices):
     if not os.path.exists('checkpoints'):
         os.makedirs('checkpoints')
     torch.save(trainer.model.state_dict(), f'checkpoints/{args.model_label}.pt')
-    if args.matrix_type != None:
+    if phi_matrices != None:
         torch.save(phi_matrices, f'checkpoints/phi_{args.model_label}.pt')
+    if theta_matrices != None:
+        torch.save(theta_matrices, f'checkpoints/theta_{args.model_label}.pt')
 
 class Trainer:
     def __init__(self, 
@@ -336,7 +338,7 @@ class Trainer:
             self.step = 1
             self.model.train()
             for x, y in self.train_dataloader:
-                x = (x.float() / 255.0).to(DEVICE)
+                x = x.float().to(DEVICE)
                 y = y.to(DEVICE)
                 if self.phi_matrices != None: compress.process_batch(x, self.phi_matrices, self.theta_matrices, self.modes)
                 verb_output, noun_output = self.model(x)
@@ -374,7 +376,7 @@ class Trainer:
         y_hats = []
         with torch.no_grad():
             for x, y in split_dataloader:
-                x = (x.float() / 255.0).to(DEVICE)
+                x = x.float().to(DEVICE)
                 y = y.to(DEVICE)
                 if self.phi_matrices != None: compress.process_batch(x, self.phi_matrices, self.theta_matrices, self.modes)
                 verb_output, noun_output = self.model(x)
@@ -426,7 +428,7 @@ def main(args):
     
     if args.learn_phi: phi_matrices = model.phi_matrices
     if args.learn_theta: theta_matrices = model.theta_matrices
-    if args.learn_phi and not args.learn_theta: theta_matrices = phi_matrices
+    if not args.learn_theta: theta_matrices = phi_matrices
 
     if args.print_model:
         print(model)
@@ -442,7 +444,7 @@ def main(args):
     trainer.train(args.epochs, args.val_frequency, args.log_frequency, args.print_frequency)
 
     if args.model_label != None:
-        save_model(trainer, args, phi_matrices)
+        save_model(trainer, args, phi_matrices, theta_matrices)
 
 if __name__ == "__main__":
     main(parser.parse_args())
