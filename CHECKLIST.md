@@ -1,6 +1,6 @@
 # Experiment checklist
 
-- [ ] Oracle
+- [x] Oracle
 
 ## Random
 
@@ -8,8 +8,8 @@
 
 #### Spatial
 
-- [ ] 158 158
-- [ ] 112 112
+- [x] 158 158
+- [x] 112 112
 - [ ] 71 71
 - [ ] 22 22
 
