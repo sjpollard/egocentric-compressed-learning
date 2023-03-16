@@ -434,7 +434,7 @@ def main(args):
         print(model)
 
     if args.log_frequency != 0:
-        wandb.init(project="egocentric-compressed-learning", config=settings)
+        wandb.init(project="egocentric-compressed-learning-results", config=settings)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=args.lr)
