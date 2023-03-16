@@ -1,4 +1,6 @@
 __pycache__
 data
-checkpoints
+checkpoints/*/*
+!checkpoints/*/phi*
+!checkpoints/*/theta*
 wandb
