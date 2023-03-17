@@ -68,15 +68,17 @@ def main(args):
     ts.show(clip)
     if args.modes != None:
         if os.path.exists(f'checkpoints/{args.model_label}/phi_{args.model_label}.pt'):
-            phi_matrices = list(torch.load(f'checkpoints/{args.model_label}/phi_{args.model_label}.pt'))
+            phi_matrices = list(torch.load(f'checkpoints/{args.model_label}/phi_{args.model_label}.pt', map_location=DEVICE))
             ts.show(phi_matrices, mode='image')
             compressed_clip = tl.tenalg.multi_mode_dot(clip, phi_matrices, args.modes)
-            ts.show(compressed_clip)
+            if compressed_clip.size(1) == 3: mode = 'image'
+            elif compressed_clip.size(1) == 1: mode = 'grayscale'
+            ts.show(compressed_clip, mode=mode)
             if not os.path.exists(f'checkpoints/{args.model_label}/theta_{args.model_label}.pt'):
                 inferred_clip = tl.tenalg.multi_mode_dot(compressed_clip, phi_matrices, args.modes, transpose=True)
                 ts.show(inferred_clip)
             else:
-                theta_matrices = list(torch.load(f'checkpoints/{args.model_label}/theta_{args.model_label}.pt'))
+                theta_matrices = list(torch.load(f'checkpoints/{args.model_label}/theta_{args.model_label}.pt', map_location=DEVICE))
                 ts.show(theta_matrices, mode='image')
                 inferred_clip = tl.tenalg.multi_mode_dot(compressed_clip, theta_matrices, args.modes, transpose=True)
                 ts.show(inferred_clip)
