@@ -39,16 +39,19 @@ def results_to_csv():
 def plot_accuracies(title, filename, measurement_rates, results_files, target):
     plt.title(title)
     plt.xticks(measurement_rates)
-    #plt.xlim([1, 8])
-    #plt.ylim([2, 3.4])
+    width = 0.2
+    shift = 0
+    plt.ylim([0, 0.7])
     labels = ["Bernoulli", "Gaussian", "Learnt Bernoulli", "Learnt Gaussian"]
     for i in range(len(results_files)):
         accuracies = []
         for results_file in results_files[i]:
             results_df = pd.read_csv(f'results/{results_file}')
             accuracies.append(results_df[f'test/{target}-accuracy'].dropna().tail(3).mean())
-        plt.plot(measurement_rates, accuracies, marker='x', label=labels[i])
-    plt.legend(loc="upper left")
+        plt.bar(np.arange(len(measurement_rates)) + shift, height=accuracies, width=width, label=labels[i])
+        shift += width
+    plt.xticks(np.arange(len(measurement_rates)) + shift / (len(labels) - 1), measurement_rates)
+    plt.legend(loc="best")
     plt.xlabel("Measurement rate")
     plt.ylabel("Accuracy(%)")
     plt.savefig(f'images/{filename}.pdf')
