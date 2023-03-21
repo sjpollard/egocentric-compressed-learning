@@ -54,7 +54,9 @@ def plot_accuracies(title, filename, measurement_rates, results_files, target):
     plt.legend(loc="best")
     plt.xlabel("Measurement rate")
     plt.ylabel("Accuracy(%)")
+    plt.savefig(f'images/{filename}.png')
     plt.savefig(f'images/{filename}.pdf')
+    plt.savefig(f'images/{filename}.svg')
     plt.clf()
 
 def main(args):
