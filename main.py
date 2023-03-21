@@ -226,9 +226,20 @@ parser.add_argument(
     "--model-label",
     default=None,
     type=str,
-    help="Saves model with given label as checkpoint for evaluation"
+    help="Label of given checkpoint"
 )
-
+parser.add_argument(
+    "--save-model",
+    default=False, 
+    action="store_true", 
+    help="Saves model for inference"
+)
+parser.add_argument(
+    "--load-model",
+    default=False, 
+    action="store_true", 
+    help="Loads model for inference"
+)
 
 def extract_settings_from_args(args: argparse.Namespace) -> Dict[str, Any]:
     settings = vars(args)
@@ -430,21 +441,25 @@ def main(args):
     if args.learn_theta: theta_matrices = model.theta_matrices
     if not args.learn_theta: theta_matrices = phi_matrices
 
-    if args.print_model:
-        print(model)
+    if args.load_model:
+        model.load_state_dict(torch.load(f'checkpoints/{args.model_label}/{args.model_label}.pt'))
+        model.eval()
+    else:
+        if args.print_model:
+            print(model)
 
-    if args.log_frequency != 0:
-        wandb.init(project="egocentric-compressed-learning-results", config=settings)
+        if args.log_frequency != 0:
+            wandb.init(project="egocentric-compressed-learning-results", config=settings)
 
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=args.lr)
+        criterion = nn.CrossEntropyLoss()
+        optimizer = optim.SGD(model.parameters(), lr=args.lr)
 
-    trainer = Trainer(model, train_dataloader, val_dataloader, test_dataloader, criterion, optimizer, phi_matrices, theta_matrices, args.modes)
+        trainer = Trainer(model, train_dataloader, val_dataloader, test_dataloader, criterion, optimizer, phi_matrices, theta_matrices, args.modes)
 
-    trainer.train(args.epochs, args.val_frequency, args.log_frequency, args.print_frequency)
+        trainer.train(args.epochs, args.val_frequency, args.log_frequency, args.print_frequency)
 
-    if args.model_label != None:
-        save_model(trainer, args, phi_matrices, theta_matrices)
+        if args.save_model:
+            save_model(trainer, args, phi_matrices, theta_matrices)
 
 if __name__ == "__main__":
     main(parser.parse_args())

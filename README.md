@@ -116,7 +116,9 @@ Reshape the compressed clip with matrix transpose for neural network input
 - `--val_frequency` (int): Epochs until validation set is tested
 - `--log_frequency` (int): Steps until logs are saved with `wandb`
 - `--print_frequency` (int): Steps until training batch results are printed
-- `--model-label` (str): Saves model with given label as checkpoint for evaluation
+- `--model-label` (str): Label of given checkpoint
+- `--save-model` (on/off): Saves model for inference
+- `--load-model` (on/off): Loads model for inference
 
 ### data.py
 
