@@ -21,6 +21,11 @@ parser.add_argument(
     action="store_true", 
     help="Plots W&B results"
 )
+parser.add_argument(
+    "--table-results", 
+    action="store_true", 
+    help="Saves results to a csv"
+)
 
 def results_to_csv():
     if not os.path.exists(f'results'):
@@ -59,6 +64,14 @@ def plot_accuracies(title, filename, measurement_rates, results_files, target):
     plt.savefig(f'images/{filename}.svg')
     plt.clf()
 
+def save_accuracies(filename, results_files, target, split):
+    accuracies = []
+    for results_file in results_files:
+        results_df = pd.read_csv(f'results/{results_file}')
+        accuracies.append(f"{results_df[f'{split}/{target}-accuracy'].dropna().tail(3).mean() * 100:.2f}")
+    table_df = pd.DataFrame({'File': results_files, 'Accuracy': accuracies})
+    table_df.to_csv(f'results/{filename}.csv', index=False)
+
 def main(args):
     if args.pull_results:
         results_to_csv()
@@ -93,6 +106,33 @@ def main(args):
                         [1, 0.5, 0.25, 0.1, 0.01], 
                         spatial_results,
                         target='noun')
+    if args.table_results:
+        spatial_results = ['P01_P02_20_v1.csv', 
+                           'P01_P02_bernoulli_158_158_2_3_20_v1.csv', 
+                           'P01_P02_bernoulli_112_112_2_3_20_v1.csv',
+                           'P01_P02_bernoulli_71_71_2_3_20_v1.csv',
+                           'P01_P02_bernoulli_22_22_2_3_20_v1.csv',
+                           'P01_P02_gaussian_158_158_2_3_20_v1.csv', 
+                           'P01_P02_gaussian_112_112_2_3_20_v1.csv',
+                           'P01_P02_gaussian_71_71_2_3_20_v1.csv',
+                           'P01_P02_gaussian_22_22_2_3_20_v1.csv',
+                           'P01_P02_bernoulli_learnt_phi_theta_158_158_2_3_20_v1.csv', 
+                           'P01_P02_bernoulli_learnt_phi_theta_112_112_2_3_20_v1.csv',
+                           'P01_P02_bernoulli_learnt_phi_theta_71_71_2_3_20_v1.csv',
+                           'P01_P02_bernoulli_learnt_phi_theta_22_22_2_3_20_v1.csv',
+                           'P01_P02_gaussian_learnt_phi_theta_158_158_2_3_20_v1.csv', 
+                           'P01_P02_gaussian_learnt_phi_theta_112_112_2_3_20_v1.csv',
+                           'P01_P02_gaussian_learnt_phi_theta_71_71_2_3_20_v1.csv',
+                           'P01_P02_gaussian_learnt_phi_theta_22_22_2_3_20_v1.csv']
+        channel_results = ['P01_P02_20_v1.csv', 
+                           'P01_P02_bernoulli_1_1_20_v1.csv',
+                           'P01_P02_gaussian_1_1_20_v1.csv',
+                           'P01_P02_bernoulli_learnt_phi_theta_1_1_20_v1.csv',
+                           'P01_P02_gaussian_learnt_phi_theta_1_1_20_v1.csv']
+        save_accuracies('verb_spatial_test', spatial_results, target='verb', split='test')
+        save_accuracies('noun_spatial_test', spatial_results, target='noun', split='test')
+        save_accuracies('verb_channel_test', channel_results, target='verb', split='test')
+        save_accuracies('noun_channel_test', channel_results, target='noun', split='test')
 
 
 if __name__ == "__main__":

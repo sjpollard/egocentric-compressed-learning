@@ -1,0 +1,6 @@
+File,Accuracy
+P01_P02_20_v1.csv,56.43
+P01_P02_bernoulli_1_1_20_v1.csv,48.29
+P01_P02_gaussian_1_1_20_v1.csv,41.05
+P01_P02_bernoulli_learnt_phi_theta_1_1_20_v1.csv,50.43
+P01_P02_gaussian_learnt_phi_theta_1_1_20_v1.csv,53.00
