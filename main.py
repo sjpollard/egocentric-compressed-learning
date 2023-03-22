@@ -12,6 +12,7 @@ import data
 import wandb
 import compress
 import os
+import torchshow as ts
 
 from model_loader import load_checkpoint, make_model
 from data import PreprocessedEPICDataset, PostprocessedEPICDataset
@@ -240,6 +241,13 @@ parser.add_argument(
     action="store_true", 
     help="Loads model for inference"
 )
+parser.add_argument(
+    "--index", 
+    default=0, 
+    type=int, 
+    help="Clip to do model inference with"
+)
+
 
 def extract_settings_from_args(args: argparse.Namespace) -> Dict[str, Any]:
     settings = vars(args)
@@ -443,7 +451,19 @@ def main(args):
 
     if args.load_model:
         model.load_state_dict(torch.load(f'checkpoints/{args.model_label}/{args.model_label}.pt'))
+        phi_matrices, theta_matrices = model.phi_matrices.to('cpu'), model.theta_matrices.to('cpu')
         model.eval()
+        with torch.no_grad():
+            x, y = test_dataloader.dataset.__getitem__(args.index)
+            ts.show(x)
+            x = x.float()
+            if phi_matrices != None: 
+                compressed = tl.tenalg.multi_mode_dot(x, phi_matrices, args.modes)
+                x = tl.tenalg.multi_mode_dot(compressed, theta_matrices, args.modes, transpose=True)
+            ts.show(x)
+            verb_output, noun_output = model(x)
+            probabilities = nn.functional.softmax(verb_output, dim=-1), nn.functional.softmax(noun_output, dim=-1)
+            print(f'true label {y}, predicted labels {torch.topk(probabilities[0], 3).indices},{torch.topk(probabilities[1], 3).indices}, probabilities {torch.topk(probabilities[0], 3).values},{torch.topk(probabilities[1], 3).values}')
     else:
         if args.print_model:
             print(model)
