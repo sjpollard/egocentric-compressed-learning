@@ -25,6 +25,7 @@ from ops.utils import compute_accuracy
 tl.set_backend('pytorch')
 
 torch.backends.cudnn.benchmark = True
+torch.autograd.set_detect_anomaly(True)
 
 if torch.cuda.is_available():
     DEVICE = torch.device('cuda')
@@ -468,12 +469,13 @@ def main(args):
     elif args.load_model:
         model.load_state_dict(torch.load(f'checkpoints/{args.model_label}/{args.model_label}.pt'))
         model.to(DEVICE)
-        phi_matrices, theta_matrices = model.phi_matrices, model.theta_matrices
-        model.eval()
+        if args.matrix_type != None:
+            phi_matrices = list(torch.load(f'checkpoints/{args.model_label}/phi_{args.model_label}.pt', map_location=DEVICE))
+            theta_matrices = list(torch.load(f'checkpoints/{args.model_label}/theta_{args.model_label}.pt', map_location=DEVICE))
         with torch.no_grad():
             x, y = test_dataloader.dataset.__getitem__(args.index)
             ts.show(x)
-            x = x.float()
+            x = x.float().to(DEVICE)
             if phi_matrices != None: 
                 compressed = tl.tenalg.multi_mode_dot(x, phi_matrices, args.modes)
                 x = tl.tenalg.multi_mode_dot(compressed, theta_matrices, args.modes, transpose=True)
