@@ -129,10 +129,25 @@ def main(args):
                            'P01_P02_gaussian_1_1_20_v1.csv',
                            'P01_P02_bernoulli_learnt_phi_theta_1_1_20_v1.csv',
                            'P01_P02_gaussian_learnt_phi_theta_1_1_20_v1.csv']
+        temporal_results = ['P01_P02_20_v1.csv', 
+                            'P01_P02_bernoulli_4_0_20_v1.csv', 
+                            'P01_P02_bernoulli_2_0_20_v1.csv',
+                            'P01_P02_bernoulli_1_0_20_v1.csv',
+                            'P01_P02_gaussian_4_0_20_v1.csv', 
+                            'P01_P02_gaussian_2_0_20_v1.csv',
+                            'P01_P02_gaussian_1_0_20_v1.csv',
+                            'P01_P02_bernoulli_learnt_phi_theta_4_0_20_v1.csv', 
+                            'P01_P02_bernoulli_learnt_phi_theta_2_0_20_v1.csv',
+                            'P01_P02_bernoulli_learnt_phi_theta_1_0_20_v1.csv',
+                            'P01_P02_gaussian_learnt_phi_theta_4_0_20_v1.csv', 
+                            'P01_P02_gaussian_learnt_phi_theta_2_0_20_v1.csv',
+                            'P01_P02_gaussian_learnt_phi_theta_1_0_20_v1.csv']
         save_accuracies('verb_spatial_test', spatial_results, target='verb', split='test')
         save_accuracies('noun_spatial_test', spatial_results, target='noun', split='test')
         save_accuracies('verb_channel_test', channel_results, target='verb', split='test')
         save_accuracies('noun_channel_test', channel_results, target='noun', split='test')
+        save_accuracies('verb_temporal_test', temporal_results, target='verb', split='test')
+        save_accuracies('noun_temporal_test', temporal_results, target='noun', split='test')
 
 
 if __name__ == "__main__":
