@@ -22,5 +22,5 @@ def random_bernoulli_matrix(shape):
 
 def process_batch(batch, phi_matrices, theta_matrices, modes):
     for i in range(batch.size(0)):
-        compressed = tl.tenalg.multi_mode_dot(batch[i], phi_matrices, modes)
+        compressed = tl.tenalg.multi_mode_dot(batch[i].clone(), phi_matrices, modes)
         batch[i] = tl.tenalg.multi_mode_dot(compressed, theta_matrices, modes, transpose=True)
