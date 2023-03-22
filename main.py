@@ -449,22 +449,7 @@ def main(args):
     if args.learn_theta: theta_matrices = model.theta_matrices
     if not args.learn_theta: theta_matrices = phi_matrices
 
-    if args.load_model:
-        model.load_state_dict(torch.load(f'checkpoints/{args.model_label}/{args.model_label}.pt'))
-        phi_matrices, theta_matrices = model.phi_matrices.to('cpu'), model.theta_matrices.to('cpu')
-        model.eval()
-        with torch.no_grad():
-            x, y = test_dataloader.dataset.__getitem__(args.index)
-            ts.show(x)
-            x = x.float()
-            if phi_matrices != None: 
-                compressed = tl.tenalg.multi_mode_dot(x, phi_matrices, args.modes)
-                x = tl.tenalg.multi_mode_dot(compressed, theta_matrices, args.modes, transpose=True)
-            ts.show(x)
-            verb_output, noun_output = model(x)
-            probabilities = nn.functional.softmax(verb_output, dim=-1), nn.functional.softmax(noun_output, dim=-1)
-            print(f'true label {y}, predicted labels {torch.topk(probabilities[0], 3).indices},{torch.topk(probabilities[1], 3).indices}, probabilities {torch.topk(probabilities[0], 3).values},{torch.topk(probabilities[1], 3).values}')
-    else:
+    if not args.load_model:
         if args.print_model:
             print(model)
 
@@ -480,6 +465,22 @@ def main(args):
 
         if args.save_model:
             save_model(trainer, args, phi_matrices, theta_matrices)
+    elif args.load_model:
+        model.load_state_dict(torch.load(f'checkpoints/{args.model_label}/{args.model_label}.pt'))
+        model.to(DEVICE)
+        phi_matrices, theta_matrices = model.phi_matrices, model.theta_matrices
+        model.eval()
+        with torch.no_grad():
+            x, y = test_dataloader.dataset.__getitem__(args.index)
+            ts.show(x)
+            x = x.float()
+            if phi_matrices != None: 
+                compressed = tl.tenalg.multi_mode_dot(x, phi_matrices, args.modes)
+                x = tl.tenalg.multi_mode_dot(compressed, theta_matrices, args.modes, transpose=True)
+            ts.show(x)
+            verb_output, noun_output = model(x)
+            probabilities = nn.functional.softmax(verb_output, dim=-1), nn.functional.softmax(noun_output, dim=-1)
+            print(f'true label {y}, predicted labels {torch.topk(probabilities[0], 3).indices},{torch.topk(probabilities[1], 3).indices}, probabilities {torch.topk(probabilities[0], 3).values},{torch.topk(probabilities[1], 3).values}')
 
 if __name__ == "__main__":
     main(parser.parse_args())
