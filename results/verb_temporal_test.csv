@@ -1,0 +1,14 @@
+File,Accuracy
+P01_P02_20_v1.csv,46.03
+P01_P02_bernoulli_4_0_20_v1.csv,45.71
+P01_P02_bernoulli_2_0_20_v1.csv,42.93
+P01_P02_bernoulli_1_0_20_v1.csv,39.34
+P01_P02_gaussian_4_0_20_v1.csv,43.89
+P01_P02_gaussian_2_0_20_v1.csv,37.62
+P01_P02_gaussian_1_0_20_v1.csv,41.80
+P01_P02_bernoulli_learnt_phi_theta_4_0_20_v1.csv,44.86
+P01_P02_bernoulli_learnt_phi_theta_2_0_20_v1.csv,38.64
+P01_P02_bernoulli_learnt_phi_theta_1_0_20_v1.csv,46.09
+P01_P02_gaussian_learnt_phi_theta_4_0_20_v1.csv,43.19
+P01_P02_gaussian_learnt_phi_theta_2_0_20_v1.csv,42.07
+P01_P02_gaussian_learnt_phi_theta_1_0_20_v1.csv,33.44
