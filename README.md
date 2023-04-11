@@ -119,6 +119,7 @@ Reshape the compressed clip with matrix transpose for neural network input
 - `--model-label` (str): Label of given checkpoint
 - `--save-model` (on/off): Saves model for inference
 - `--load-model` (on/off): Loads model for inference
+- `--index` (int): Clip to do model inference with
 
 ### data.py
 
