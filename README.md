@@ -65,7 +65,7 @@ python main.py tsn --label example --chunks c ... --learn-phi --learn-theta
 To save model as a checkpoint after training
 
 ```
-python main.py tsn --label example --chunks c ... --model-label example-model
+python main.py tsn --label example --chunks c ... --model-label example-model --save-model
 ```
 
 To visualise annotation and compressed sensing with checkpointed matrix
