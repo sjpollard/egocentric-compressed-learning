@@ -205,9 +205,18 @@ def main(args):
         verb_clf, noun_clf = DummyClassifier(strategy='stratified'), DummyClassifier(strategy='stratified')
         verb_clf = verb_clf.fit(None, train['verb_class'])
         noun_clf = noun_clf.fit(None, train['noun_class'])
-        print(f'train verb {verb_clf.score(None, train["verb_class"])}, train noun {noun_clf.score(None, train["noun_class"])}')
-        print(f'val verb {verb_clf.score(None, val["verb_class"])}, val noun {noun_clf.score(None, val["noun_class"])}')
-        print(f'test verb {verb_clf.score(None, test["verb_class"])}, test noun {noun_clf.score(None, test["noun_class"])}')
+        accuracies = []
+        for i in range(1000):
+            accuracies.append([verb_clf.score(None, train["verb_class"]),
+                              noun_clf.score(None, train["noun_class"]),
+                              verb_clf.score(None, val["verb_class"]),
+                              noun_clf.score(None, val["noun_class"]),
+                              verb_clf.score(None, test["verb_class"]),
+                              noun_clf.score(None, test["noun_class"])])
+        accuracies = np.mean(np.array(accuracies), axis=0)
+        print(f'train verb {accuracies[0]* 100:.2f}, train noun {accuracies[1]* 100:.2f}')
+        print(f'val verb {accuracies[2]* 100:.2f}, val noun {accuracies[3]* 100:.2f}')
+        print(f'test verb {accuracies[4]* 100:.2f}, test noun {accuracies[5]* 100:.2f}')
 
     else:
         preprocess_epic(args.label, args.num_annotations, args.chunks, tuple(args.ratio), dataprocessor, args.segment_count, args.seed)
