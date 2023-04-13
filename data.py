@@ -10,7 +10,7 @@ from torchvision import transforms
 from PIL import Image
 from torch.utils.data import Dataset
 from sklearn.model_selection import train_test_split
-from ops.utils import compute_accuracy
+from sklearn.dummy import DummyClassifier
 
 tl.set_backend('pytorch')
 
@@ -202,26 +202,13 @@ def main(args):
     if args.random_perf:
         train, val, test = dataprocessor.load_annotations(args.label)
 
-        train_counts = train['verb_class'].value_counts(normalize=True), train['noun_class'].value_counts(normalize=True)
-        train_classes = train_counts[0].index.to_numpy(), train_counts[1].index.to_numpy()
-        train_probs = train_counts[0].to_numpy(), train_counts[1].to_numpy()
-        train_ys = train[['verb_class', 'noun_class']].to_numpy()
-        train_y_hats = np.random.default_rng().choice(train_classes[0], train_ys.shape[0], p=train_probs[0]), np.random.default_rng().choice(train_classes[1], train_ys.shape[0], p=train_probs[1])
-        print(f'train verb {compute_accuracy(train_ys[:, 0], train_y_hats[0])}, train noun {compute_accuracy(train_ys[:, 1], train_y_hats[1])}')
-        
-        val_counts = val['verb_class'].value_counts(normalize=True), val['noun_class'].value_counts(normalize=True)
-        val_classes = val_counts[0].index.to_numpy(), val_counts[1].index.to_numpy()
-        val_probs = val_counts[0].to_numpy(), val_counts[1].to_numpy()
-        val_ys = val[['verb_class', 'noun_class']].to_numpy()
-        val_y_hats = np.random.default_rng().choice(val_classes[0], val_ys.shape[0], p=val_probs[0]), np.random.default_rng().choice(val_classes[1], val_ys.shape[0], p=val_probs[1])
-        print(f'val verb {compute_accuracy(val_ys[:, 0], val_y_hats[0])}, val noun {compute_accuracy(val_ys[:, 1], val_y_hats[1])}')
+        verb_clf, noun_clf = DummyClassifier(strategy='stratified'), DummyClassifier(strategy='stratified')
+        verb_clf = verb_clf.fit(None, train['verb_class'])
+        noun_clf = noun_clf.fit(None, train['noun_class'])
+        print(f'train verb {verb_clf.score(None, train["verb_class"])}, train noun {noun_clf.score(None, train["noun_class"])}')
+        print(f'val verb {verb_clf.score(None, val["verb_class"])}, val noun {noun_clf.score(None, val["noun_class"])}')
+        print(f'test verb {verb_clf.score(None, test["verb_class"])}, test noun {noun_clf.score(None, test["noun_class"])}')
 
-        test_counts = test['verb_class'].value_counts(normalize=True), test['noun_class'].value_counts(normalize=True)
-        test_classes = test_counts[0].index.to_numpy(), test_counts[1].index.to_numpy()
-        test_probs = test_counts[0].to_numpy(), test_counts[1].to_numpy()
-        test_ys = test[['verb_class', 'noun_class']].to_numpy()
-        test_y_hats = np.random.default_rng().choice(test_classes[0], test_ys.shape[0], p=test_probs[0]), np.random.default_rng().choice(test_classes[1], test_ys.shape[0], p=test_probs[1])
-        print(f'test verb {compute_accuracy(test_ys[:, 0], test_y_hats[0])}, test noun {compute_accuracy(test_ys[:, 1], test_y_hats[1])}')
     else:
         preprocess_epic(args.label, args.num_annotations, args.chunks, tuple(args.ratio), dataprocessor, args.segment_count, args.seed)
    
