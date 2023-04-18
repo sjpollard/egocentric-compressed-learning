@@ -1,0 +1,6 @@
+File,Accuracy
+P01_P02_20_v1.csv,46.03
+P01_P02_bernoulli_112_2_20_v1.csv,40.68
+P01_P02_bernoulli_56_2_20_v1.csv,40.25
+P01_P02_bernoulli_22_2_20_v1.csv,32.64
+P01_P02_bernoulli_2_2_20_v1.csv,33.23
