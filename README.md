@@ -68,6 +68,18 @@ To save model as a checkpoint after training
 python main.py tsn --label example --chunks c ... --model-label example-model --save-model
 ```
 
+To use model inference on a single clip
+
+```
+python main.py tsn --label example --chunks c ... --model-label example-model --load-model clip
+```
+
+To use model inference on entire test dataset
+
+```
+python main.py tsn --label example --chunks c ... --model-label example-model --load-model dataset --matrix-model example-matrix-model
+```
+
 To visualise annotation and compressed sensing with checkpointed matrix
 
 ```
@@ -76,21 +88,7 @@ python visualise.py --label example --model-label example-model --chunks c --mod
 
 ## How does it work?
 
-Take an example clip from EPIC-KITCHENS
-
-![](./images/example_clip.png)
-
-Here we have measurement matrices for spatial compression
-
-![](./images/example_phi_matrices.png)
-
-Apply these matrices to compress the clip
-
-![](./images/example_compressed_clip.png)
-
-Reshape the compressed clip with matrix transpose for neural network input
-
-![](./images/example_inferred_clip.png)
+![](./images/compressed_learning_front-end.pdf)
 
 ## Arguments
 
@@ -118,7 +116,7 @@ Reshape the compressed clip with matrix transpose for neural network input
 - `--print_frequency` (int): Steps until training batch results are printed
 - `--model-label` (str): Label of given checkpoint
 - `--save-model` (on/off): Saves model for inference
-- `--load-model` (on/off): Loads model for inference
+- `--load-model` (str): Loads model for `'clip'` or `'dataset'` inference
 - `--index` (int): Clip to do model inference with
 
 ### data.py
