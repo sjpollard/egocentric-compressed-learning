@@ -202,7 +202,7 @@ def main(args):
     if args.random_perf:
         train, val, test = dataprocessor.load_annotations(args.label)
 
-        verb_clf, noun_clf = DummyClassifier(strategy='stratified'), DummyClassifier(strategy='stratified')
+        verb_clf, noun_clf = DummyClassifier(strategy='stratified', random_state=0), DummyClassifier(strategy='stratified', random_state=0)
         verb_clf = verb_clf.fit(None, train['verb_class'])
         noun_clf = noun_clf.fit(None, train['noun_class'])
         accuracies = []
@@ -214,9 +214,22 @@ def main(args):
                               verb_clf.score(None, test["verb_class"]),
                               noun_clf.score(None, test["noun_class"])])
         accuracies = np.mean(np.array(accuracies), axis=0)
-        print(f'train verb {accuracies[0]* 100:.2f}, train noun {accuracies[1]* 100:.2f}')
-        print(f'val verb {accuracies[2]* 100:.2f}, val noun {accuracies[3]* 100:.2f}')
-        print(f'test verb {accuracies[4]* 100:.2f}, test noun {accuracies[5]* 100:.2f}')
+        print(f'random train verb {accuracies[0]* 100:.2f}, random train noun {accuracies[1]* 100:.2f}')
+        print(f'random val verb {accuracies[2]* 100:.2f}, random val noun {accuracies[3]* 100:.2f}')
+        print(f'random test verb {accuracies[4]* 100:.2f}, random test noun {accuracies[5]* 100:.2f}')
+
+        verb_clf, noun_clf = DummyClassifier(strategy='most_frequent'), DummyClassifier(strategy='most_frequent')
+        verb_clf = verb_clf.fit(None, train['verb_class'])
+        noun_clf = noun_clf.fit(None, train['noun_class'])
+        accuracies = [verb_clf.score(None, train["verb_class"]),
+                              noun_clf.score(None, train["noun_class"]),
+                              verb_clf.score(None, val["verb_class"]),
+                              noun_clf.score(None, val["noun_class"]),
+                              verb_clf.score(None, test["verb_class"]),
+                              noun_clf.score(None, test["noun_class"])]
+        print(f'deterministic train verb {accuracies[0]* 100:.2f}, deterministic train noun {accuracies[1]* 100:.2f}')
+        print(f'deterministic val verb {accuracies[2]* 100:.2f}, deterministic val noun {accuracies[3]* 100:.2f}')
+        print(f'deterministic test verb {accuracies[4]* 100:.2f}, deterministic test noun {accuracies[5]* 100:.2f}')
 
     else:
         preprocess_epic(args.label, args.num_annotations, args.chunks, tuple(args.ratio), dataprocessor, args.segment_count, args.seed)
