@@ -2,6 +2,10 @@
 
 Improving the portability and tractability of egocentric action recognition on EPIC-KITCHENS by learning with compressed measurements.
 
+## How does it work?
+
+![](./images/compressed_learning_front-end.png)
+
 ## Installation
 
 Clone egocentric-compressed-learning
@@ -85,10 +89,6 @@ To visualise annotation and compressed sensing with checkpointed matrix
 ```
 python visualise.py --label example --model-label example-model --chunks c --modes 0 1 2 3
 ```
-
-## How does it work?
-
-![](./images/compressed_learning_front-end.png)
 
 ## Arguments
 
