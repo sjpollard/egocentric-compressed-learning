@@ -238,8 +238,8 @@ parser.add_argument(
 )
 parser.add_argument(
     "--load-model",
-    default=False, 
-    action="store_true", 
+    default=None, 
+    choices=[None, "clip", "dataset"],
     help="Loads model for inference"
 )
 parser.add_argument(
@@ -262,7 +262,6 @@ def extract_settings_from_args(args: argparse.Namespace) -> Dict[str, Any]:
             settings[stripped_key] = settings[key]
             del settings[key]
     return settings
-
 
 def get_dataloaders(dataprocessor, args):
     if args.load == 'preprocessed':
@@ -330,6 +329,24 @@ def save_model(trainer, args, phi_matrices, theta_matrices):
         torch.save(phi_matrices, f'checkpoints/{args.model_label}/phi_{args.model_label}.pt')
     if theta_matrices != None:
         torch.save(theta_matrices, f'checkpoints/{args.model_label}/theta_{args.model_label}.pt')
+
+def clip_inference(model, args, test_dataloader, phi_matrices, theta_matrices):
+    model.load_state_dict(torch.load(f'checkpoints/{args.model_label}/{args.model_label}.pt'))
+    model.to(DEVICE)
+    if args.matrix_type != None:
+        phi_matrices = list(torch.load(f'checkpoints/{args.model_label}/phi_{args.model_label}.pt', map_location=DEVICE))
+        theta_matrices = list(torch.load(f'checkpoints/{args.model_label}/theta_{args.model_label}.pt', map_location=DEVICE))
+    with torch.no_grad():
+        x, y = test_dataloader.dataset.__getitem__(args.index)
+        ts.show(x)
+        x = x.float().to(DEVICE)
+        if phi_matrices != None: 
+            compressed = tl.tenalg.multi_mode_dot(x, phi_matrices, args.modes)
+            x = tl.tenalg.multi_mode_dot(compressed, theta_matrices, args.modes, transpose=True)
+        ts.show(x)
+        verb_output, noun_output = model(x)
+        probabilities = nn.functional.softmax(verb_output, dim=-1), nn.functional.softmax(noun_output, dim=-1)
+        print(f'true label {y}, predicted labels {torch.topk(probabilities[0], 3).indices},{torch.topk(probabilities[1], 3).indices}, probabilities {torch.topk(probabilities[0], 3).values},{torch.topk(probabilities[1], 3).values}')
 
 class Trainer:
     def __init__(self, 
@@ -450,7 +467,7 @@ def main(args):
     if args.learn_theta: theta_matrices = model.theta_matrices
     if not args.learn_theta: theta_matrices = phi_matrices
 
-    if not args.load_model:
+    if args.load_model == None:
         if args.print_model:
             print(model)
 
@@ -466,23 +483,8 @@ def main(args):
 
         if args.save_model:
             save_model(trainer, args, phi_matrices, theta_matrices)
-    elif args.load_model:
-        model.load_state_dict(torch.load(f'checkpoints/{args.model_label}/{args.model_label}.pt'))
-        model.to(DEVICE)
-        if args.matrix_type != None:
-            phi_matrices = list(torch.load(f'checkpoints/{args.model_label}/phi_{args.model_label}.pt', map_location=DEVICE))
-            theta_matrices = list(torch.load(f'checkpoints/{args.model_label}/theta_{args.model_label}.pt', map_location=DEVICE))
-        with torch.no_grad():
-            x, y = test_dataloader.dataset.__getitem__(args.index)
-            ts.show(x)
-            x = x.float().to(DEVICE)
-            if phi_matrices != None: 
-                compressed = tl.tenalg.multi_mode_dot(x, phi_matrices, args.modes)
-                x = tl.tenalg.multi_mode_dot(compressed, theta_matrices, args.modes, transpose=True)
-            ts.show(x)
-            verb_output, noun_output = model(x)
-            probabilities = nn.functional.softmax(verb_output, dim=-1), nn.functional.softmax(noun_output, dim=-1)
-            print(f'true label {y}, predicted labels {torch.topk(probabilities[0], 3).indices},{torch.topk(probabilities[1], 3).indices}, probabilities {torch.topk(probabilities[0], 3).values},{torch.topk(probabilities[1], 3).values}')
+    elif args.load_model == 'clip':
+        clip_inference(model, args, test_dataloader, phi_matrices, theta_matrices)
 
 if __name__ == "__main__":
     main(parser.parse_args())
