@@ -88,7 +88,7 @@ python visualise.py --label example --model-label example-model --chunks c --mod
 
 ## How does it work?
 
-![](./images/compressed_learning_front-end.pdf)
+![](./images/compressed_learning_front-end.png)
 
 ## Arguments
 
