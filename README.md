@@ -78,10 +78,10 @@ To use model inference on a single clip
 python main.py tsn --label example --chunks c ... --model-label example-model --load-model clip
 ```
 
-To use model inference on entire test dataset
+To use model inference on entire test dataset, potentially with other model matrices
 
 ```
-python main.py tsn --label example --chunks c ... --model-label example-model --load-model dataset --matrix-model example-matrix-model
+python main.py tsn --label example --chunks c ... --model-label example-model --load-model dataset --matrix-label example-matrix
 ```
 
 To visualise annotation and compressed sensing with checkpointed matrix
@@ -118,6 +118,7 @@ python visualise.py --label example --model-label example-model --chunks c --mod
 - `--save-model` (on/off): Saves model for inference
 - `--load-model` (str): Loads model for `'clip'` or `'dataset'` inference
 - `--index` (int): Clip to do model inference with
+- `--matrix-label` (str): Label of matrix checkpoint to use for inference
 
 ### data.py
 
