@@ -13,6 +13,7 @@ import wandb
 import compress
 import os
 import torchshow as ts
+import pandas as pd
 
 from model_loader import load_checkpoint, make_model
 from data import PreprocessedEPICDataset, PostprocessedEPICDataset
@@ -248,7 +249,12 @@ parser.add_argument(
     type=int, 
     help="Clip to do model inference with"
 )
-
+parser.add_argument(
+    "--matrix-label",
+    default=None,
+    type=str,
+    help="Label of matrix checkpoint to use for inference"
+)
 
 def extract_settings_from_args(args: argparse.Namespace) -> Dict[str, Any]:
     settings = vars(args)
@@ -333,6 +339,7 @@ def save_model(trainer, args, phi_matrices, theta_matrices):
 def clip_inference(model, args, test_dataloader, phi_matrices, theta_matrices):
     model.load_state_dict(torch.load(f'checkpoints/{args.model_label}/{args.model_label}.pt'))
     model.to(DEVICE)
+    model.eval()
     if args.matrix_type != None:
         phi_matrices = list(torch.load(f'checkpoints/{args.model_label}/phi_{args.model_label}.pt', map_location=DEVICE))
         theta_matrices = list(torch.load(f'checkpoints/{args.model_label}/theta_{args.model_label}.pt', map_location=DEVICE))
@@ -347,6 +354,34 @@ def clip_inference(model, args, test_dataloader, phi_matrices, theta_matrices):
         verb_output, noun_output = model(x)
         probabilities = nn.functional.softmax(verb_output, dim=-1), nn.functional.softmax(noun_output, dim=-1)
         print(f'true label {y}, predicted labels {torch.topk(probabilities[0], 3).indices},{torch.topk(probabilities[1], 3).indices}, probabilities {torch.topk(probabilities[0], 3).values},{torch.topk(probabilities[1], 3).values}')
+
+def dataset_inference(model, args, test_dataloader, phi_matrices, theta_matrices):
+    model.load_state_dict(torch.load(f'checkpoints/{args.model_label}/{args.model_label}.pt'))
+    model.to(DEVICE)
+    model.eval()
+    if args.matrix_type != None:
+        phi_matrices = list(torch.load(f'checkpoints/{args.matrix_label}/phi_{args.matrix_label}.pt', map_location=DEVICE))
+        theta_matrices = list(torch.load(f'checkpoints/{args.matrix_label}/theta_{args.matrix_label}.pt', map_location=DEVICE))
+    ys = []
+    y_hats = []
+    with torch.no_grad():
+        for x, y in test_dataloader:
+            x = x.float().to(DEVICE)
+            y = y.to(DEVICE)
+            #ts.show(x[0])
+            if phi_matrices != None: compress.process_batch(x, phi_matrices, theta_matrices, args.modes)
+            #ts.show(x[0])
+            verb_output, noun_output = model(x)
+            y_hat_verb = torch.argmax(verb_output, dim=-1)
+            y_hat_noun = torch.argmax(noun_output, dim=-1)
+            ys.append(y)
+            y_hats.append(torch.stack((y_hat_verb, y_hat_noun), 1))
+    ys = torch.cat(ys)
+    y_hats = torch.cat(y_hats)
+    print(pd.DataFrame(y_hats.to('cpu')).astype('object').describe())
+    verb_accuracy = compute_accuracy(ys[:, 0], y_hats[:, 0])
+    noun_accuracy = compute_accuracy(ys[:, 1], y_hats[:, 1])
+    print(f'verb accuracy {verb_accuracy * 100:.2f}, noun accuracy {noun_accuracy * 100:.2f}')
 
 class Trainer:
     def __init__(self, 
@@ -485,6 +520,8 @@ def main(args):
             save_model(trainer, args, phi_matrices, theta_matrices)
     elif args.load_model == 'clip':
         clip_inference(model, args, test_dataloader, phi_matrices, theta_matrices)
+    elif args.load_model == 'dataset':
+        dataset_inference(model, args, test_dataloader, phi_matrices, theta_matrices)
 
 if __name__ == "__main__":
     main(parser.parse_args())
