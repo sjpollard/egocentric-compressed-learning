@@ -368,9 +368,7 @@ def dataset_inference(model, args, test_dataloader, phi_matrices, theta_matrices
         for x, y in test_dataloader:
             x = x.float().to(DEVICE)
             y = y.to(DEVICE)
-            #ts.show(x[0])
             if phi_matrices != None: compress.process_batch(x, phi_matrices, theta_matrices, args.modes)
-            #ts.show(x[0])
             verb_output, noun_output = model(x)
             y_hat_verb = torch.argmax(verb_output, dim=-1)
             y_hat_noun = torch.argmax(noun_output, dim=-1)
