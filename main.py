@@ -240,7 +240,7 @@ parser.add_argument(
 parser.add_argument(
     "--load-model",
     default=None, 
-    choices=[None, "clip", "dataset"],
+    choices=[None, "clip", "dataset", "filters"],
     help="Loads model for inference"
 )
 parser.add_argument(
@@ -382,6 +382,17 @@ def dataset_inference(model, args, test_dataloader, phi_matrices, theta_matrices
     noun_accuracy = compute_accuracy(ys[:, 1], y_hats[:, 1])
     print(f'verb accuracy {verb_accuracy * 100:.2f}, noun accuracy {noun_accuracy * 100:.2f}')
 
+def visualise_filters(model, args):
+    model.load_state_dict(torch.load(f'checkpoints/{args.model_label}/{args.model_label}.pt'))
+    model.to(DEVICE)
+    model.eval()
+    print(list(model.state_dict()))
+    ts.show(model.state_dict()['base_model.conv1.weight'])
+    ts.show(torch.sum(model.state_dict()['base_model.layer1.0.conv2.weight'], dim=1, keepdim=True))
+    ts.show(torch.sum(model.state_dict()['base_model.layer2.0.conv2.weight'], dim=1, keepdim=True))
+    ts.show(torch.sum(model.state_dict()['base_model.layer3.0.conv2.weight'], dim=1, keepdim=True))
+    ts.show(torch.sum(model.state_dict()['base_model.layer4.0.conv2.weight'], dim=1, keepdim=True))
+
 class Trainer:
     def __init__(self, 
                  model: nn.Module, 
@@ -521,6 +532,8 @@ def main(args):
         clip_inference(model, args, test_dataloader, phi_matrices, theta_matrices)
     elif args.load_model == 'dataset':
         dataset_inference(model, args, test_dataloader, phi_matrices, theta_matrices)
+    elif args.load_model == 'filters':
+        visualise_filters(model, args)
 
 if __name__ == "__main__":
     main(parser.parse_args())

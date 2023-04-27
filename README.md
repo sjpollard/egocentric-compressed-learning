@@ -84,6 +84,11 @@ To use model inference on entire test dataset, potentially with other model matr
 python main.py tsn --label example --chunks c ... --model-label example-model --load-model dataset --matrix-label example-matrix
 ```
 
+To visualise CNN filters
+```
+python main.py tsn --label example --chunks c ... --model-label example-model --load-model filters
+```
+
 To visualise annotation and compressed sensing with checkpointed matrix
 
 ```
@@ -116,7 +121,7 @@ python visualise.py --label example --model-label example-model --chunks c --mod
 - `--print_frequency` (int): Steps until training batch results are printed
 - `--model-label` (str): Label of given checkpoint
 - `--save-model` (on/off): Saves model for inference
-- `--load-model` (str): Loads model for `'clip'` or `'dataset'` inference
+- `--load-model` (str): Loads model for `'clip'`, `'dataset'` or `'filters'` inference
 - `--index` (int): Clip to do model inference with
 - `--matrix-label` (str): Label of matrix checkpoint to use for inference
 
