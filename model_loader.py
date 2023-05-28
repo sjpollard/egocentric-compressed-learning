@@ -6,7 +6,7 @@ import torch
 from tsm import TSM
 from tsn import TSN, TRN, MTRN
 
-verb_class_count, noun_class_count = 97, 300
+verb_class_count, noun_class_count = 97, 302
 class_count = (verb_class_count, noun_class_count)
 
 
